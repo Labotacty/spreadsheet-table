@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Sheets API 表示</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Googleスプレッドシートのデータ</h2>
+    <table id="sheetTable">
+        <thead>
+            <tr id="tableHeader"></tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+
+    <script>
+        const sheetID = "1Vn-LSQZHBdbfnjMfHDGD4Lqr30egE46MEQFrptIZRFc"; // あなたのスプレッドシートID
+        const apiKey = "AIzaSyDiQaxgz_ixPu6lzQXwdOPzgaKvflUfcio"; // ここにGoogle APIキーを入れる
+        const range = "シート2!A1:I"; // 取得したい範囲（A1からZ列まで）
+
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/${range}?key=${apiKey}`;
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                const rows = data.values;
+                if (!rows || rows.length === 0) {
+                    console.log("データが見つかりません");
+                    return;
+                }
+
+                const tableHeader = document.getElementById("tableHeader");
+                const tableBody = document.getElementById("tableBody");
+
+                // ヘッダー作成
+                const columnCount = rows[0].length; // 最大列数を取得
+                rows[0].forEach(header => {
+                    const th = document.createElement("th");
+                    th.textContent = header;
+                    tableHeader.appendChild(th);
+                });
+
+                // データ行作成（空セル補完）
+                rows.slice(1).forEach(row => {
+                    const tr = document.createElement("tr");
+                    for (let i = 0; i < columnCount; i++) {
+                        const td = document.createElement("td");
+                        td.textContent = row[i] !== undefined ? row[i] : ""; // 空のセルも生成
+                        tr.appendChild(td);
+                    }
+                    tableBody.appendChild(tr);
+                });
+            })
+            .catch(error => console.error("データ取得エラー:", error));
+    </script>
+
+</body>
+</html>
