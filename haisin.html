@@ -5,18 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Google Sheets API 表示</title>
     <style>
-        /* テーブルを横スクロール可能に */
+        /* テーブルの外側にスクロール用のコンテナを作成 */
         .table-container {
             width: 100%;
-            overflow-x: auto; /* スマホで横スクロール対応 */
-            max-height: 400px; /* ヘッダー固定用の高さ制限 */
-            position: relative;
+            overflow-x: auto; /* 横スクロールを有効化 */
+            -webkit-overflow-scrolling: touch; /* iOSのスムーズスクロール対応 */
         }
 
         /* テーブルのスタイル */
         table {
             width: 100%;
-            min-width: 600px; /* スマホでも横スクロール可能にする */
+            min-width: 600px; /* スマホでも横スクロールを発生させる */
             border-collapse: collapse;
             font-family: Arial, sans-serif;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
@@ -37,6 +36,18 @@
             color: white;
             font-weight: bold;
             z-index: 2;
+        }
+
+        /* スマホで横スクロールバーが確実に表示されるように */
+        .table-container::-webkit-scrollbar {
+            height: 8px; /* スクロールバーの高さを設定 */
+        }
+        .table-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        .table-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
         }
 
         /* 行のストライプデザイン */
