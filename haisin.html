@@ -5,33 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Google Sheets API 表示</title>
     <style>
-        /* スクロール可能なコンテナ */
+        /* テーブル全体をスクロール可能に */
         .table-container {
             width: 100%;
             overflow-x: auto; /* 横スクロール対応 */
         }
 
+        /* テーブルのスタイル */
         table {
-            border-collapse: collapse;
             width: 100%;
-            min-width: 600px; /* 小さすぎるテーブルを防ぐ */
+            min-width: 600px;
+            border-collapse: collapse;
+            font-family: Arial, sans-serif;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
 
         th, td {
-            border: 1px solid black;
-            padding: 8px;
+            border: 1px solid #ddd;
+            padding: 12px;
             text-align: left;
         }
 
+        /* ヘッダーのスタイル */
         th {
-            background-color: #f2f2f2;
+            background-color: #4CAF50;
+            color: white;
+            font-weight: bold;
         }
 
-        /* スマホ用のスタイル */
+        /* 行のストライプデザイン（交互に色付け） */
+        tbody tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        /* ホバー時の色変更 */
+        tbody tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        /* スマホ対応 */
         @media (max-width: 600px) {
             th, td {
-                padding: 6px;
-                font-size: 14px; /* フォントを小さめに */
+                padding: 10px;
+                font-size: 14px;
             }
         }
     </style>
