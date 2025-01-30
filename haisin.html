@@ -5,34 +5,53 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Google Sheets API 表示</title>
     <style>
+        /* スクロール可能なコンテナ */
+        .table-container {
+            width: 100%;
+            overflow-x: auto; /* 横スクロール対応 */
+        }
+
         table {
             border-collapse: collapse;
             width: 100%;
+            min-width: 600px; /* 小さすぎるテーブルを防ぐ */
         }
+
         th, td {
             border: 1px solid black;
             padding: 8px;
             text-align: left;
         }
+
         th {
             background-color: #f2f2f2;
+        }
+
+        /* スマホ用のスタイル */
+        @media (max-width: 600px) {
+            th, td {
+                padding: 6px;
+                font-size: 14px; /* フォントを小さめに */
+            }
         }
     </style>
 </head>
 <body>
 
     <h2>Googleスプレッドシートのデータ</h2>
-    <table id="sheetTable">
-        <thead>
-            <tr id="tableHeader"></tr>
-        </thead>
-        <tbody id="tableBody"></tbody>
-    </table>
+    <div class="table-container">
+        <table id="sheetTable">
+            <thead>
+                <tr id="tableHeader"></tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
 
     <script>
-        const sheetID = "1Vn-LSQZHBdbfnjMfHDGD4Lqr30egE46MEQFrptIZRFc"; // あなたのスプレッドシートID
-        const apiKey = "AIzaSyDiQaxgz_ixPu6lzQXwdOPzgaKvflUfcio"; // ここにGoogle APIキーを入れる
-        const range = "シート2!A1:I"; // 取得したい範囲（A1からZ列まで）
+        const sheetID = "1Vn-LSQZHBdbfnjMfHDGD4Lqr30egE46MEQFrptIZRFc"; // スプレッドシートID
+        const apiKey = "AIzaSyDiQaxgz_ixPu6lzQXwdOPzgaKvflUfcio"; // Google APIキー
+        const range = "シート2!A1:I"; // 取得範囲
 
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/${range}?key=${apiKey}`;
 
@@ -49,7 +68,7 @@
                 const tableBody = document.getElementById("tableBody");
 
                 // ヘッダー作成
-                const columnCount = rows[0].length; // 最大列数を取得
+                const columnCount = rows[0].length;
                 rows[0].forEach(header => {
                     const th = document.createElement("th");
                     th.textContent = header;
@@ -61,7 +80,7 @@
                     const tr = document.createElement("tr");
                     for (let i = 0; i < columnCount; i++) {
                         const td = document.createElement("td");
-                        td.textContent = row[i] !== undefined ? row[i] : ""; // 空のセルも生成
+                        td.textContent = row[i] !== undefined ? row[i] : ""; // 空セル対応
                         tr.appendChild(td);
                     }
                     tableBody.appendChild(tr);
