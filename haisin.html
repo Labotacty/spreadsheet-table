@@ -10,6 +10,8 @@
             width: 100%;
             overflow-x: auto; /* 横スクロールを有効化 */
             -webkit-overflow-scrolling: touch; /* iOSのスムーズスクロール対応 */
+            overflow-y: auto; /* 縦スクロールを有効化（ヘッダー固定用） */
+            max-height: 400px; /* 最大高さを指定して、縦スクロールが発生するように */
         }
 
         /* テーブルのスタイル */
@@ -37,11 +39,11 @@
         /* ヘッダーの固定 */
         thead tr {
             position: sticky;
-            top: 0;
+            top: 0; /* ヘッダーを上部に固定 */
             background-color: #4CAF50;
             color: white;
             font-weight: bold;
-            z-index: 2;
+            z-index: 2; /* ヘッダーが他の要素より上に来るように */
         }
 
         /* スマホで横スクロールバーが確実に表示されるように */
