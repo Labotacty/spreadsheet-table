@@ -127,7 +127,7 @@
 
         let tableData = []; // データ保存用
         let sortOrder = {}; // ソート状態
-        const unsortableColumns = [0]; // ソート不可の列（0番目のID列をソート禁止）
+        const unsortableColumns = [6]; // ソート不可の列（6番目のID列をソート禁止）
 
         fetch(url)
             .then(response => response.json())
