@@ -48,6 +48,11 @@
             cursor: pointer; /* ソート可能 */
         }
 
+        /* ソート済みの列をハイライト */
+        th.sorted {
+            background-color: #ffcc80 !important;
+        }
+
         /* スクロールバーのデザイン */
         .table-container::-webkit-scrollbar {
             height: 8px;
@@ -83,11 +88,25 @@
                 font-size: 14px;
             }
         }
+
+        /* 検索ボックスのスタイル */
+        #searchInput {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
 
     <h2>Googleスプレッドシートのデータ</h2>
+    
+    <!-- 検索フィルター -->
+    <input type="text" id="searchInput" placeholder="検索..." onkeyup="filterTable()">
+
     <div class="table-container">
         <table id="sheetTable">
             <thead>
@@ -106,6 +125,7 @@
 
         let tableData = []; // データ保存用
         let sortOrder = {}; // ソート状態
+        const unsortableColumns = [0]; // ソート不可の列（0番目のID列をソート禁止）
 
         fetch(url)
             .then(response => response.json())
@@ -129,8 +149,13 @@
             rows[0].forEach((header, index) => {
                 const th = document.createElement("th");
                 th.textContent = header;
-                th.onclick = () => sortTable(index); // クリックでソート
-                th.innerHTML += `<span class="sort-icon">▲▼</span>`; // アイコン追加
+
+                // ソート禁止の列はクリックイベントを付けない
+                if (!unsortableColumns.includes(index)) {
+                    th.onclick = () => sortTable(index);
+                    th.innerHTML += `<span class="sort-icon">▲▼</span>`;
+                }
+
                 tableHeader.appendChild(th);
             });
 
@@ -153,6 +178,9 @@
         }
 
         function sortTable(columnIndex) {
+            // ソート不可の列なら処理しない
+            if (unsortableColumns.includes(columnIndex)) return;
+
             // 昇順・降順を切り替え
             const order = sortOrder[columnIndex] === "asc" ? "desc" : "asc";
             sortOrder[columnIndex] = order;
@@ -175,11 +203,21 @@
         }
 
         function updateSortIcons(columnIndex, order) {
-            document.querySelectorAll(".sort-icon").forEach((icon, index) => {
-                icon.innerHTML = index === columnIndex
-                    ? (order === "asc" ? "▲" : "▼")
-                    : "▲▼";
+            document.querySelectorAll("th").forEach((th, index) => {
+                th.classList.toggle("sorted", index === columnIndex);
+                const icon = th.querySelector(".sort-icon");
+                if (icon) {
+                    icon.innerHTML = index === columnIndex
+                        ? (order === "asc" ? "▲" : "▼")
+                        : "▲▼";
+                }
             });
+        }
+
+        function filterTable() {
+            const searchValue = document.getElementById("searchInput").value.toLowerCase();
+            const filteredData = tableData.filter(row => row.some(cell => (cell || "").toLowerCase().includes(searchValue)));
+            renderTable(filteredData);
         }
     </script>
 
