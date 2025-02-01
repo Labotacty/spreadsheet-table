@@ -116,11 +116,27 @@
             margin: 0;
             background-color: #4CAF50;
             color: white;
+            flex-wrap: wrap; /* スマホで改行しても収まるように */
         }
 
         #updateInfo {
             font-size: 0.9rem;
             color: #f9f9f9;
+            white-space: nowrap; /* 更新日時とバージョンは改行しない */
+            margin-left: 10px;
+        }
+
+        /* 画面幅が狭い場合でもタイトルが収まるように調整 */
+        @media (max-width: 600px) {
+            #pageTitle {
+                font-size: 1.2rem; /* フォントサイズを少し小さく */
+            }
+            #updateInfo {
+                font-size: 0.8rem; /* 更新日時とバージョンのフォントサイズも調整 */
+                margin-top: 5px; /* スマホでは少し下に余白をつける */
+                text-align: center; /* スマホでは中央揃え */
+                width: 100%; /* 幅を100%にして表示させる */
+            }
         }
     </style>
 </head>
@@ -155,7 +171,7 @@
         const apiKey = "AIzaSyDiQaxgz_ixPu6lzQXwdOPzgaKvflUfcio"; // Google APIキー
         const range = "シート2!A1:G"; // 取得範囲
         const formattedDate = "2025/02/01"; 
-        const version = "v0.0.1"; // ページバージョン
+        const version = "v0.0.2"; // ページバージョン
         document.getElementById("updateInfo").textContent = `最終更新: ${formattedDate} | バージョン: ${version}`;
 
 
