@@ -177,17 +177,6 @@
 
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/${range}?key=${apiKey}`;
 
-        fetch(url)
-            .then(response => response.json())
-            .then(data => {
-                const rows = data.values;
-                if (!rows || rows.length === 0) {
-                    console.log("データが見つかりません");
-                    return;
-                }
-
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/${range}?key=${apiKey}`;
-
         let tableData = []; // データ保存用
         let sortOrder = {}; // ソート状態
         const unsortableColumns = [6]; // ソート不可の列（6番目のID列をソート禁止）
