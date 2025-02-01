@@ -114,6 +114,7 @@
     
     <!-- 検索フィルター -->
     <input type="text" id="searchInput" placeholder="検索..." onkeyup="filterTable()">
+    <p id="resultCount">🔍 検索結果: 0 件</p>
 
     <div class="table-container">
         <table id="sheetTable">
@@ -227,6 +228,27 @@
             const filteredData = tableData.filter(row => row.some(cell => (cell || "").toLowerCase().includes(searchValue)));
             renderTable(filteredData);
         }
+
+        document.getElementById("searchInput").addEventListener("input", function () {
+            const searchText = this.value.toLowerCase();
+            const rows = document.querySelectorAll("#tableBody tr");
+            let matchCount = 0;
+        
+            rows.forEach(row => {
+                const cells = Array.from(row.getElementsByTagName("td"));
+                const text = cells.map(cell => cell.textContent.toLowerCase()).join(" ");
+                
+                if (text.includes(searchText)) {
+                    row.style.display = "";
+                    matchCount++; // ✅ ヒットした行の数をカウント
+                } else {
+                    row.style.display = "none";
+               　}
+            });
+
+        // ✅ 検索結果の件数を更新
+        document.getElementById("resultCount").textContent = `🔍 検索結果: ${matchCount} 件`;
+    });
         
     </script>
 
