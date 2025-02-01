@@ -247,21 +247,19 @@
                 const text = cell.textContent;
                 const lowerText = text.toLowerCase();
     
-                // 🔹 検索対象文字列が一致していればハイライト
                 if (searchText && lowerText.includes(searchText)) {
                     rowMatch = true;
-    
-                    // 🔹 ハイライトする部分を再処理
+                    // 🔹 検索文字列に一致する部分をハイライト
                     const regex = new RegExp(`(${searchText})`, "gi");
                     const newHtml = text.replace(regex, '<span class="highlight">$1</span>');
-                    cell.innerHTML = newHtml;
+                    cell.innerHTML = newHtml; // ハイライト適用
                 } else {
-                    // 🔹 一致しない場合は元のテキストに戻す
+                    // 🔹 一致しない場合は元に戻す
                     cell.innerHTML = text;
                 }
             }
     
-            // 🔹 検索結果に一致する行だけを表示
+            // 🔹 一致した行を表示
             if (rowMatch) {
                 row.style.display = "";
                 matchCount++;
@@ -272,6 +270,18 @@
     
         // 🔹 検索結果の件数を表示
         document.getElementById("resultCount").textContent = `🔍 検索結果: ${matchCount} 件`;
+    
+        // 🔹 検索文字列が空の場合、テーブルを元に戻す
+        if (searchText === "") {
+            rows.forEach(row => {
+                const cells = row.getElementsByTagName("td");
+                cells.forEach(cell => {
+                    const text = cell.textContent;
+                    cell.innerHTML = text; // 元のテキストに戻す
+                });
+            });
+            document.getElementById("resultCount").textContent = ''; // 検索結果のカウントをクリア
+        }
     });
         
     </script>
