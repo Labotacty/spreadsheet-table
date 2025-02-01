@@ -100,6 +100,11 @@
             border: 1px solid #ddd;
             border-radius: 4px;
         }
+
+        .highlight {
+            background-color: yellow;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -229,26 +234,41 @@
             renderTable(filteredData);
         }
 
-        document.getElementById("searchInput").addEventListener("input", function () {
-            const searchText = this.value.toLowerCase();
-            const rows = document.querySelectorAll("#tableBody tr");
-            let matchCount = 0;
-        
-            rows.forEach(row => {
-                const cells = Array.from(row.getElementsByTagName("td"));
-                const text = cells.map(cell => cell.textContent.toLowerCase()).join(" ");
+    document.getElementById("searchInput").addEventListener("input", function () {
+        const searchText = this.value.toLowerCase();
+        const rows = document.querySelectorAll("#tableBody tr");
+        let matchCount = 0;
+    
+        rows.forEach(row => {
+            let rowMatch = false;
+            const cells = row.getElementsByTagName("td");
+    
+            for (let cell of cells) {
+                const text = cell.textContent;
+                const lowerText = text.toLowerCase();
                 
-                if (text.includes(searchText)) {
-                    row.style.display = "";
-                    matchCount++; // ✅ ヒットした行の数をカウント
+                if (searchText && lowerText.includes(searchText)) {
+                    rowMatch = true;
+                    // 🔹 一致する部分をハイライト
+                    const regex = new RegExp(`(${searchText})`, "gi");
+                    cell.innerHTML = text.replace(regex, '<span class="highlight">$1</span>');
                 } else {
-                    row.style.display = "none";
-               　}
-            });
+                    cell.innerHTML = text; // 🔹 クリア（ハイライトを消す）
+                }
+            }
+    
+            // 🔹 一致する行だけ表示
+            if (rowMatch) {
+                row.style.display = "";
+                matchCount++;
+            } else {
+                row.style.display = "none";
+            }
+        });
 
-        // ✅ 検索結果の件数を更新
-        document.getElementById("resultCount").textContent = `🔍 検索結果: ${matchCount} 件`;
-    });
+    // 🔹 検索結果の件数を更新
+    document.getElementById("resultCount").textContent = `🔍 検索結果: ${matchCount} 件`;
+});
         
     </script>
 
