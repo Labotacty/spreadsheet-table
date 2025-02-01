@@ -105,12 +105,29 @@
             background-color: yellow;
             font-weight: bold;
         }
+        
+        /* ページタイトルのスタイル */
+        #pageTitle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.5rem;
+            padding: 10px 20px;
+            margin: 0;
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        #updateInfo {
+            font-size: 0.9rem;
+            color: #f9f9f9;
+        }
     </style>
 </head>
 <body>
 
     <h1 id="pageTitle">
-        たくらぼ配信でプレイしたゲームリストVer.0.3
+        たくらぼ配信でプレイしたゲームリスト
         <span id="updateInfo"></span>
     </h1>
     
@@ -146,13 +163,28 @@
             .then(response => response.json())
             .then(metadata => {
                 const lastUpdated = metadata.properties.modifiedTime; // 最終更新日時
-
-                // スプレッドシートの最終更新日時を表示
-                const lastUpdatedDate = new Date(lastUpdated).toLocaleString();
-                const version = "v1.0.0"; // ページバージョン
-                document.getElementById("updateInfo").textContent = `最終更新: ${lastUpdatedDate} | バージョン: ${version}`;
+                
+                if (lastUpdated) {
+                    const lastUpdatedDate = new Date(lastUpdated); // UTC日時をローカルタイムに変換
+                    const formattedDate = lastUpdatedDate.toLocaleString(); // ローカル時間にフォーマット
+                    const version = "v0.0.1"; // ページバージョン
+                    document.getElementById("updateInfo").textContent = `最終更新: ${formattedDate} | バージョン: ${version}`;
+                } else {
+                    console.error("最終更新日時が取得できませんでした。");
+                }
             })
             .catch(error => console.error("最終更新日時の取得エラー:", error));
+
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/${range}?key=${apiKey}`;
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                const rows = data.values;
+                if (!rows || rows.length === 0) {
+                    console.log("データが見つかりません");
+                    return;
+                }
 
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/${range}?key=${apiKey}`;
 
