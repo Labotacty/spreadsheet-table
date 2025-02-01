@@ -219,6 +219,17 @@
             const filteredData = tableData.filter(row => row.some(cell => (cell || "").toLowerCase().includes(searchValue)));
             renderTable(filteredData);
         }
+            // データ行作成（空セル補完）
+        rows.slice(1).forEach(row => {
+            const tr = document.createElement("tr");
+            for (let i = 0; i < columnCount; i++) {
+                const td = document.createElement("td");
+                td.textContent = row[i] !== undefined ? row[i] : ""; // 空セル対応
+                tr.appendChild(td);
+            }
+            tableBody.appendChild(tr);
+        });
+        
     </script>
 
 </body>
