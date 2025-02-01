@@ -154,26 +154,10 @@
         const sheetID = "1Vn-LSQZHBdbfnjMfHDGD4Lqr30egE46MEQFrptIZRFc"; // スプレッドシートID
         const apiKey = "AIzaSyDiQaxgz_ixPu6lzQXwdOPzgaKvflUfcio"; // Google APIキー
         const range = "シート2!A1:G"; // 取得範囲
+        const formattedDate = "2025/02/01"; 
+        const version = "v0.0.1"; // ページバージョン
+        document.getElementById("updateInfo").textContent = `最終更新: ${formattedDate} | バージョン: ${version}`;
 
-        // 最終更新日時を取得するためのAPI URL
-        const sheetMetadataUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}?key=${apiKey}`;
-
-        // 最初にスプレッドシートのメタデータを取得
-        fetch(sheetMetadataUrl)
-            .then(response => response.json())
-            .then(metadata => {
-                const lastUpdated = metadata.properties.modifiedTime; // 最終更新日時
-                
-                if (lastUpdated) {
-                    const lastUpdatedDate = new Date(lastUpdated); // UTC日時をローカルタイムに変換
-                    const formattedDate = lastUpdatedDate.toLocaleString(); // ローカル時間にフォーマット
-                    const version = "v0.0.1"; // ページバージョン
-                    document.getElementById("updateInfo").textContent = `最終更新: ${formattedDate} | バージョン: ${version}`;
-                } else {
-                    console.error("最終更新日時が取得できませんでした。");
-                }
-            })
-            .catch(error => console.error("最終更新日時の取得エラー:", error));
 
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/${range}?key=${apiKey}`;
 
