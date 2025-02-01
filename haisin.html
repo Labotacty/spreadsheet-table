@@ -18,7 +18,7 @@
         table {
             width: 100%;
             min-width: 600px;
-            border-collapse: collapse;
+            border-collapse: collapse; /* 罫線を確実に適用 */
             font-family: Arial, sans-serif;
         }
 
@@ -33,6 +33,7 @@
             text-align: left;
             white-space: nowrap;
             font-size: 16px;
+            min-height: 20px; /* 空セルでも高さを確保 */
         }
 
         /* ヘッダーの固定 */
@@ -164,13 +165,13 @@
 
     function renderTable(data) {
         const tableBody = document.getElementById("tableBody");
-        tableBody.innerHTML = ""; // 一度リセット
+        tableBody.innerHTML = ""; // テーブルをリセット
 
         data.forEach(row => {
             const tr = document.createElement("tr");
-            for (let i = 0; i < tableData[0].length; i++) {
+            for (let i = 0; i < data[0].length; i++) {
                 const td = document.createElement("td");
-                td.textContent = row[i] !== undefined && row[i] !== "" ? row[i] : "\u00A0"; // 空セルに&nbsp;を入れる
+                td.innerHTML = row[i] !== undefined && row[i] !== "" ? row[i] : "&nbsp;"; // 空セル対策
                 tr.appendChild(td);
             }
             tableBody.appendChild(tr);
