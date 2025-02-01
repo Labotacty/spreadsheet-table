@@ -109,8 +109,11 @@
 </head>
 <body>
 
-    <h2>たくらぼ配信プレイゲームリストVer.0.2</h2>
-
+    <h1 id="pageTitle">
+        たくらぼ配信でプレイしたゲームリストVer.0.3
+        <span id="updateInfo"></span>
+    </h1>
+    
     <p>
         <a href="https://www.youtube.com/playlist?list=PLKffMDfIWsbbXZXSjrkkiFI1pk-sGPN4F" target="_blank">
             📺 再生リストを見る
@@ -134,6 +137,22 @@
         const sheetID = "1Vn-LSQZHBdbfnjMfHDGD4Lqr30egE46MEQFrptIZRFc"; // スプレッドシートID
         const apiKey = "AIzaSyDiQaxgz_ixPu6lzQXwdOPzgaKvflUfcio"; // Google APIキー
         const range = "シート2!A1:G"; // 取得範囲
+
+        // 最終更新日時を取得するためのAPI URL
+        const sheetMetadataUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}?key=${apiKey}`;
+
+        // 最初にスプレッドシートのメタデータを取得
+        fetch(sheetMetadataUrl)
+            .then(response => response.json())
+            .then(metadata => {
+                const lastUpdated = metadata.properties.modifiedTime; // 最終更新日時
+
+                // スプレッドシートの最終更新日時を表示
+                const lastUpdatedDate = new Date(lastUpdated).toLocaleString();
+                const version = "v1.0.0"; // ページバージョン
+                document.getElementById("updateInfo").textContent = `最終更新: ${lastUpdatedDate} | バージョン: ${version}`;
+            })
+            .catch(error => console.error("最終更新日時の取得エラー:", error));
 
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/${range}?key=${apiKey}`;
 
