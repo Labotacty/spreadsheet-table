@@ -268,7 +268,7 @@
             });
         }
 
-        function filterTable() {
+    function filterTable() {
         const searchText = document.getElementById("searchInput").value.toLowerCase();
         const rows = document.querySelectorAll("#tableBody tr");
         let matchCount = 0;
@@ -283,16 +283,19 @@
 
                 if (searchText && lowerText.includes(searchText)) {
                     rowMatch = true;
-                    // 正規表現で検索ワードをハイライト
+                    // 🔹 ハイライト適用
                     const regex = new RegExp(`(${searchText})`, "gi");
                     cell.innerHTML = text.replace(regex, '<span class="highlight">$1</span>');
                 } else {
-                    cell.innerHTML = text; // ハイライトを解除
+                    cell.innerHTML = text; // 🔹 ハイライトを解除
                 }
             }
 
-            // 一致する行のみ表示
-            if (rowMatch) {
+            // 🔹 検索ボックスが空ならすべて表示
+            if (searchText === "") {
+                row.style.display = "";
+                matchCount = rows.length; // 全件表示
+            } else if (rowMatch) {
                 row.style.display = "";
                 matchCount++;
             } else {
@@ -300,14 +303,14 @@
             }
         });
 
-        // 検索結果の件数を更新
+        // 🔹 検索結果の件数を更新
         document.getElementById("resultCount").textContent = `🔍 検索結果: ${matchCount} 件`;
     }
 
-    // 検索フィールドのイベントを設定
+    // 🔹 検索フィールドのイベント設定
     document.getElementById("searchInput").addEventListener("input", filterTable);
-  
-    </script>
+        
+  </script>
 
 </body>
 </html>
