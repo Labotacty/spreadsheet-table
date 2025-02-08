@@ -157,6 +157,10 @@
     <input type="text" id="searchInput" placeholder="検索..." onkeyup="filterTable()">
     <p id="resultCount">🔍 検索結果: 0 件</p>
 
+    <!-- ランダムピックアップボタン -->
+    <button id="randomPickBtn">🎲 ランダムに5つピックアップ</button>
+    <button id="resetBtn" style="display: none;">🔄 元に戻す</button>
+
     <div class="table-container">
         <table id="sheetTable">
             <thead>
@@ -309,6 +313,39 @@
 
     // 🔹 検索フィールドのイベント設定
     document.getElementById("searchInput").addEventListener("input", filterTable);
+
+
+        document.getElementById("randomPickBtn").addEventListener("click", function () {
+        const rows = Array.from(document.querySelectorAll("#tableBody tr"));
+
+        if (rows.length === 0) return; // データがない場合は処理しない
+
+        // 🔹 ランダムに5つ選択
+        const randomRows = rows.sort(() => 0.5 - Math.random()).slice(0, 5);
+
+        // 🔹 すべて非表示にして、選ばれた5つだけ表示
+        rows.forEach(row => row.style.display = "none");
+        randomRows.forEach(row => row.style.display = "");
+
+        // 🔹 検索結果の件数を更新
+        document.getElementById("resultCount").textContent = `🎲 ランダム表示: ${randomRows.length} 件`;
+
+        // 🔹 リセットボタンを表示
+        document.getElementById("resetBtn").style.display = "inline-block";
+    });
+
+    document.getElementById("resetBtn").addEventListener("click", function () {
+        const rows = document.querySelectorAll("#tableBody tr");
+
+        // 🔹 すべての行を表示
+        rows.forEach(row => row.style.display = "");
+
+        // 🔹 検索結果の件数を全件に戻す
+        document.getElementById("resultCount").textContent = `🔍 検索結果: ${rows.length} 件`;
+
+        // 🔹 リセットボタンを非表示
+        this.style.display = "none";
+    });
         
   </script>
 
