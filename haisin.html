@@ -171,7 +171,7 @@
         const apiKey = "AIzaSyDiQaxgz_ixPu6lzQXwdOPzgaKvflUfcio"; // Google APIキー
         const range = "シート2!A1:G"; // 取得範囲
         const formattedDate = "2025/02/01"; 
-        const version = "v0.0.4"; // ページバージョン
+        const version = "v0.0.5"; // ページバージョン
         document.getElementById("updateInfo").textContent = `最終更新: ${formattedDate} | バージョン: ${version}`;
 
 
@@ -268,47 +268,47 @@
             });
         }
 
-        function filterTable() {
-            const searchValue = document.getElementById("searchInput").value.toLowerCase();
-            const filteredData = tableData.filter(row => row.some(cell => (cell || "").toLowerCase().includes(searchValue)));
-            renderTable(filteredData);
-        }
-
-    document.getElementById("searchInput").addEventListener("input", function () {
-        const searchText = this.value.toLowerCase();
+    function filterTable() {
+        const searchText = document.getElementById("searchInput").value.toLowerCase();
         const rows = document.querySelectorAll("#tableBody tr");
         let matchCount = 0;
-    
+
         rows.forEach(row => {
             let rowMatch = false;
             const cells = row.getElementsByTagName("td");
-    
+
             for (let cell of cells) {
-                const text = cell.textContent;
+                const text = cell.textContent || "";
                 const lowerText = text.toLowerCase();
-                
+
                 if (searchText && lowerText.includes(searchText)) {
                     rowMatch = true;
-                    // 🔹 一致する部分をハイライト
+                    // 🔹 ハイライト適用
                     const regex = new RegExp(`(${searchText})`, "gi");
                     cell.innerHTML = text.replace(regex, '<span class="highlight">$1</span>');
                 } else {
-                    cell.innerHTML = text; // 🔹 クリア（ハイライトを消す）
+                    cell.innerHTML = text; // 🔹 ハイライトを解除
                 }
             }
-    
-            // 🔹 一致する行だけ表示
-            if (rowMatch) {
+
+            // 🔹 検索ボックスが空ならすべて表示
+            if (searchText === "") {
+                row.style.display = "";
+                matchCount = rows.length; // 全件表示
+            } else if (rowMatch) {
                 row.style.display = "";
                 matchCount++;
             } else {
                 row.style.display = "none";
             }
         });
-    
+
         // 🔹 検索結果の件数を更新
         document.getElementById("resultCount").textContent = `🔍 検索結果: ${matchCount} 件`;
-    });
+    }
+
+    // 🔹 検索フィールドのイベント設定
+    document.getElementById("searchInput").addEventListener("input", filterTable);
   
     </script>
 
