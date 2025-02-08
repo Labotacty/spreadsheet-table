@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>たくらぼ配信データベース</title>
+    <style>
+        /* テーブルをスクロール可能にするコンテナ */
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            max-height: 80vh; /* 画面の80%の高さで制限 */
+            border: 1px solid #ddd;
+        }
+
+        /* テーブルのスタイル */
+        table {
+            width: 100%;
+            min-width: 600px;
+            border-collapse: collapse; /* 罫線を確実に適用 */
+            font-family: Arial, sans-serif;
+            empty-cells: show; /* 空セルの罫線を表示 */
+        }
+
+        html {
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+            white-space: nowrap;
+            font-size: 16px;
+            min-height: 20px; /* 空セルでも高さを確保 */
+        }
+
+        /* ヘッダーの固定 */
+        thead {
+            position: sticky;
+            top: 0;
+            background-color: #4CAF50;
+            color: white;
+            z-index: 2;
+        }
+
+        thead tr {
+            cursor: pointer; /* ソート可能 */
+        }
+
+        /* ソート済みの列をハイライト */
+        th.sorted {
+            background-color: #ffcc80 !important;
+        }
+
+        /* スクロールバーのデザイン */
+        .table-container::-webkit-scrollbar {
+            height: 8px;
+        }
+        .table-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        .table-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        /* 奇数行の背景色 */
+        tbody tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        /* ホバー時の色 */
+        tbody tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        /* ソート用のアイコン */
+        .sort-icon {
+            margin-left: 8px;
+            font-size: 12px;
+        }
+
+        /* スマホ対応 */
+        @media (max-width: 600px) {
+            th, td {
+                padding: 10px;
+                font-size: 14px;
+            }
+        }
+
+        /* 検索ボックスのスタイル */
+        #searchInput {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .highlight {
+            background-color: yellow;
+            font-weight: bold;
+        }
+        
+        /* ページタイトルのスタイル */
+        #pageTitle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.5rem;
+            padding: 10px 20px;
+            margin: 0;
+            background-color: #4CAF50;
+            color: white;
+            flex-wrap: wrap; /* スマホで改行しても収まるように */
+        }
+
+        #updateInfo {
+            font-size: 0.9rem;
+            color: #f9f9f9;
+            white-space: nowrap; /* 更新日時とバージョンは改行しない */
+            margin-left: 10px;
+        }
+
+        /* 画面幅が狭い場合でもタイトルが収まるように調整 */
+        @media (max-width: 600px) {
+            #pageTitle {
+                font-size: 1.1rem; /* フォントサイズを少し小さく */
+            }
+            #updateInfo {
+                font-size: 0.5rem; /* 更新日時とバージョンのフォントサイズも調整 */
+                margin-top: 5px; /* スマホでは少し下に余白をつける */
+                text-align: center; /* スマホでは中央揃え */
+                width: 100%; /* 幅を100%にして表示させる */
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <h1 id="pageTitle">
+        たくらぼ配信でプレイしたゲームリスト
+        <span id="updateInfo"></span>
+    </h1>
+    
+    <p>
+        <a href="https://www.youtube.com/playlist?list=PLKffMDfIWsbbXZXSjrkkiFI1pk-sGPN4F" target="_blank">
+            📺 再生リストを見る
+        </a>
+    </p>
+    
+    <!-- 検索フィルター -->
+    <input type="text" id="searchInput" placeholder="検索..." onkeyup="filterTable()">
+    <p id="resultCount">🔍 検索結果: 0 件</p>
+
+    <div class="table-container">
+        <table id="sheetTable">
+            <thead>
+                <tr id="tableHeader"></tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+
+    <script>
+        const sheetID = "1Vn-LSQZHBdbfnjMfHDGD4Lqr30egE46MEQFrptIZRFc"; // スプレッドシートID
+        const apiKey = "AIzaSyDiQaxgz_ixPu6lzQXwdOPzgaKvflUfcio"; // Google APIキー
+        const range = "シート2!A1:G"; // 取得範囲
+        const formattedDate = "2025/02/01"; 
+        const version = "v0.0.4"; // ページバージョン
+        document.getElementById("updateInfo").textContent = `最終更新: ${formattedDate} | バージョン: ${version}`;
+
+
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/${range}?key=${apiKey}`;
+
+        let tableData = []; // データ保存用
+        let sortOrder = {}; // ソート状態
+        const unsortableColumns = [6]; // ソート不可の列（6番目のID列をソート禁止）
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                const rows = data.values;
+                if (!rows || rows.length === 0) {
+                    console.log("データが見つかりません");
+                    return;
+                }
+
+                tableData = rows.slice(1); // データ保存
+                createTable(rows);
+            })
+            .catch(error => console.error("データ取得エラー:", error));
+
+        function createTable(rows) {
+            const tableHeader = document.getElementById("tableHeader");
+            const tableBody = document.getElementById("tableBody");
+
+            // ヘッダーを作成
+            rows[0].forEach((header, index) => {
+                const th = document.createElement("th");
+                th.textContent = header;
+
+                // ソート禁止の列はクリックイベントを付けない
+                if (!unsortableColumns.includes(index)) {
+                    th.onclick = () => sortTable(index);
+                    th.innerHTML += `<span class="sort-icon">▲▼</span>`;
+                }
+
+                tableHeader.appendChild(th);
+            });
+
+            renderTable(tableData);
+        }
+
+    function renderTable(data) {
+        const tableBody = document.getElementById("tableBody");
+        tableBody.innerHTML = ""; // テーブルをリセット
+
+        data.forEach(row => {
+            const tr = document.createElement("tr");
+            for (let i = 0; i < data[0].length; i++) {
+                const td = document.createElement("td");
+                td.innerHTML = row[i] !== undefined && row[i] !== "" ? row[i] : "&nbsp;"; // 空セル対策
+                tr.appendChild(td);
+            }
+            tableBody.appendChild(tr);
+        });
+    }
+
+        function sortTable(columnIndex) {
+            // ソート不可の列なら処理しない
+            if (unsortableColumns.includes(columnIndex)) return;
+
+            // 昇順・降順を切り替え
+            const order = sortOrder[columnIndex] === "asc" ? "desc" : "asc";
+            sortOrder[columnIndex] = order;
+
+            tableData.sort((a, b) => {
+                let valA = a[columnIndex] || "";
+                let valB = b[columnIndex] || "";
+
+                if (!isNaN(valA) && !isNaN(valB)) {
+                    return order === "asc" ? valA - valB : valB - valA;
+                }
+
+                return order === "asc"
+                    ? valA.localeCompare(valB, 'ja')
+                    : valB.localeCompare(valA, 'ja');
+            });
+
+            renderTable(tableData);
+            updateSortIcons(columnIndex, order);
+        }
+
+        function updateSortIcons(columnIndex, order) {
+            document.querySelectorAll("th").forEach((th, index) => {
+                th.classList.toggle("sorted", index === columnIndex);
+                const icon = th.querySelector(".sort-icon");
+                if (icon) {
+                    icon.innerHTML = index === columnIndex
+                        ? (order === "asc" ? "▲" : "▼")
+                        : "▲▼";
+                }
+            });
+        }
+
+        function filterTable() {
+        const searchText = document.getElementById("searchInput").value.toLowerCase();
+        const rows = document.querySelectorAll("#tableBody tr");
+        let matchCount = 0;
+
+        rows.forEach(row => {
+            let rowMatch = false;
+            const cells = row.getElementsByTagName("td");
+
+            for (let cell of cells) {
+                const text = cell.textContent || "";
+                const lowerText = text.toLowerCase();
+
+                if (searchText && lowerText.includes(searchText)) {
+                    rowMatch = true;
+                    // 正規表現で検索ワードをハイライト
+                    const regex = new RegExp(`(${searchText})`, "gi");
+                    cell.innerHTML = text.replace(regex, '<span class="highlight">$1</span>');
+                } else {
+                    cell.innerHTML = text; // ハイライトを解除
+                }
+            }
+
+            // 一致する行のみ表示
+            if (rowMatch) {
+                row.style.display = "";
+                matchCount++;
+            } else {
+                row.style.display = "none";
+            }
+        });
+
+        // 検索結果の件数を更新
+        document.getElementById("resultCount").textContent = `🔍 検索結果: ${matchCount} 件`;
+    }
+
+    // 検索フィールドのイベントを設定
+    document.getElementById("searchInput").addEventListener("input", filterTable);
+  
+    </script>
+
+</body>
+</html>
