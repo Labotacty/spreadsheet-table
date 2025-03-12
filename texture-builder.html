@@ -4,224 +4,320 @@
 	
 	<head>
 		<title>GBG Texture Builder</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 		<link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet">
+		<style>
+			* { 
+				font-family: "Varela Round", sans-serif; 
+				box-sizing: border-box;
+			}
+			body {
+				margin: 0;
+				padding: 10px;
+				background-color: #f0f0f0;
+			}
+			.container {
+				max-width: 100%;
+			}
+			.panel {
+				background-color: #B0B0B0; 
+				padding: 8px; 
+				border-radius: 16px; 
+				padding: 1px 20px;
+				margin-bottom: 15px;
+			}
+			input[type="checkbox"] { 
+				margin: 20px; 
+			}
+			.color { 
+				border: 2px solid black;
+			}
+			fieldset {
+				border: 2px solid #808080; 
+				width: 100%; 
+				max-width: 600px;
+				margin-bottom: 15px;
+				border-radius: 5px;
+			}
+			button {
+				padding: 8px 12px;
+				margin: 4px;
+				border-radius: 4px;
+			}
+			#image, #canvas {
+				max-width: 100%;
+				height: auto;
+				border: 2px solid black;
+			}
+			
+			/* レスポンシブ対応 */
+			@media (max-width: 768px) {
+				fieldset {
+					padding: 8px;
+				}
+				table {
+					display: block;
+					overflow-x: auto;
+				}
+				button {
+					padding: 8px;
+					font-size: 14px;
+				}
+			}
+			
+			@media (max-width: 480px) {
+				.panel {
+					padding: 1px 10px;
+				}
+				input[type="checkbox"] {
+					margin: 10px;
+				}
+				.color {
+					width: 25px;
+					height: 25px;
+				}
+			}
+		</style>
 	</head>
 	
-	<style>
-		* { font-family: "Varela Round", sans-serif; }
-		input[type="checkbox"] { margin 20px; }
-		.color { border:2px solid black;"}
-	</style>
-	
 	<body>
-		<div style="display: block; background-color: #B0B0B0; padding: 8px; border-radius: 16px; padding: 1px 20px;">
-			<h2>GBG Texture Builder v1.3</h2>
-			<p><input id="file" type="file" accept="image/*,.csv,.GTD" name="image"></p>
-			<div id="display" style="display: none;">
-				<p><img id="image" style="border:2px solid black;"/><p>
-				<button id="generate">Generate!</button>
-				<div id="done">
-					<p><canvas id="canvas" style="border:2px solid black;"></canvas></p>
-					<p><button id="csv"></button>&nbsp&nbsp<button id="GTD"></button></p>
+		<div class="container">
+			<div class="panel">
+				<h2>GBG Texture Builder</h2>
+				<p><input id="file" type="file" accept="image/*,.csv,.GTD" name="image"></p>
+				<div id="display" style="display: none;">
+					<p><img id="image" style="border:2px solid black;"/></p>
+					<button id="generate">Generate!</button>
+					<div id="done">
+						<p><canvas id="canvas" style="border:2px solid black;"></canvas></p>
+						<p><button id="csv"></button>&nbsp;&nbsp;<button id="GTD"></button></p>
+					</div>
 				</div>
 			</div>
-		</div>
-		<br>
-		<div id=options style="display: none; background-color: #B0B0B0; padding: 8px; border-radius: 16px; padding: 1px 20px;">
-			<h2>Options</h2>
-			<fieldset style="border:2px solid #808080; width:600px">
-				<legend style="font-weight:bold;">Palette</legend>
-				<button id="select">Select All</button>&nbsp&nbsp<button id="deselect">Deselect All</button>
-				<table>
-					<tr height="32">
-						<th id="color0"   class=color width="32"><input type="checkbox" checked></th>
-						<th id="color1"   class=color width="32"><input type="checkbox" checked></th>
-						<th id="color2"   class=color width="32"><input type="checkbox" checked></th>
-						<th id="color3"   class=color width="32"><input type="checkbox" checked></th>
-						<th id="color4"   class=color width="32"><input type="checkbox" checked></th>
-						<th id="color5"   class=color width="32"><input type="checkbox" checked></th>
-						<th id="color6"   class=color width="32"><input type="checkbox" checked></th>
-						<th id="color7"   class=color width="32"><input type="checkbox" checked></th>
-						<th id="color8"   class=color width="32"><input type="checkbox" checked></th>
-						<th id="color9"   class=color width="32"><input type="checkbox" checked></th>
-						<th id="color10"  class=color width="32"><input type="checkbox" checked></th>
-						<th id="color11"  class=color width="32"><input type="checkbox" checked></th>
-						<th id="color12"  class=color width="32"><input type="checkbox" checked></th>
-						<th id="color13"  class=color width="32"><input type="checkbox" checked></th>
-						<th id="color14"  class=color width="32"><input type="checkbox" checked></th>
-					</tr>
-					<tr height="32">
-						<th id="color15"  class=color><input type="checkbox" checked></th>
-						<th id="color16"  class=color><input type="checkbox" checked></th>
-						<th id="color17"  class=color><input type="checkbox" checked></th>
-						<th id="color18"  class=color><input type="checkbox" checked></th>
-						<th id="color19"  class=color><input type="checkbox" checked></th>
-						<th id="color20"  class=color><input type="checkbox" checked></th>
-						<th id="color21"  class=color><input type="checkbox" checked></th>
-						<th id="color22"  class=color><input type="checkbox" checked></th>
-						<th id="color23"  class=color><input type="checkbox" checked></th>
-						<th id="color24"  class=color><input type="checkbox" checked></th>
-						<th id="color25"  class=color><input type="checkbox" checked></th>
-						<th id="color26"  class=color><input type="checkbox" checked></th>
-						<th id="color27"  class=color><input type="checkbox" checked></th>
-						<th id="color28"  class=color><input type="checkbox" checked></th>
-						<th id="color29"  class=color><input type="checkbox" checked></th>
-					</tr>
-					<tr height="32">
-						<th id="color30"  class=color><input type="checkbox" checked></th>
-						<th id="color31"  class=color><input type="checkbox" checked></th>
-						<th id="color32"  class=color><input type="checkbox" checked></th>
-						<th id="color33"  class=color><input type="checkbox" checked></th>
-						<th id="color34"  class=color><input type="checkbox" checked></th>
-						<th id="color35"  class=color><input type="checkbox" checked></th>
-						<th id="color36"  class=color><input type="checkbox" checked></th>
-						<th id="color37"  class=color><input type="checkbox" checked></th>
-						<th id="color38"  class=color><input type="checkbox" checked></th>
-						<th id="color39"  class=color><input type="checkbox" checked></th>
-						<th id="color40"  class=color><input type="checkbox" checked></th>
-						<th id="color41"  class=color><input type="checkbox" checked></th>
-						<th id="color42"  class=color><input type="checkbox" checked></th>
-						<th id="color43"  class=color><input type="checkbox" checked></th>
-						<th id="color44"  class=color><input type="checkbox" checked></th>
-					</tr>
-					<tr height="32">
-						<th></th>
-						<th></th>
-						<th id="color47" class=color style="background-image: linear-gradient(45deg, #E0E0E0 25%, transparent 25%), linear-gradient(-45deg, #E0E0E0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #E0E0E0 75%), linear-gradient(-45deg, transparent 75%, #E0E0E0 75%); background-size: 12px 12px; background-position: 0 0, 0 6px, 6px -6px, -6px 0px;
-	"><input type="checkbox" checked></th>
-						<th id="color48"  class=color><input type="checkbox" checked></th>
-						<th id="color49"  class=color><input type="checkbox" checked></th>
-						<th id="color50"  class=color><input type="checkbox" checked></th>
-						<th id="color51"  class=color><input type="checkbox" checked></th>
-						<th id="color52"  class=color><input type="checkbox" checked></th>
-						<th id="color53"  class=color><input type="checkbox" checked></th>
-						<th id="color54"  class=color><input type="checkbox" checked></th>
-						<th id="color55"  class=color><input type="checkbox" checked></th>
-						<th id="color56"  class=color><input type="checkbox" checked></th>
-						<th id="color57"  class=color><input type="checkbox" checked></th>
-						<th id="color58"  class=color><input type="checkbox" checked></th>
-						<th id="color59"  class=color><input type="checkbox" checked></th>
-					</tr>
-					<tr height="32">
-						<th></th>
-						<th></th>
-						<th></th>
-						<th id="color63"  class=color><input type="checkbox" checked></th>
-						<th id="color64"  class=color><input type="checkbox" checked></th>
-						<th id="color65"  class=color><input type="checkbox" checked></th>
-						<th id="color66"  class=color><input type="checkbox" checked></th>
-						<th id="color67"  class=color><input type="checkbox" checked></th>
-						<th id="color68"  class=color><input type="checkbox" checked></th>
-						<th id="color69"  class=color><input type="checkbox" checked></th>
-						<th id="color70"  class=color><input type="checkbox" checked></th>
-						<th id="color71"  class=color><input type="checkbox" checked></th>
-						<th id="color72"  class=color><input type="checkbox" checked></th>
-						<th id="color73"  class=color><input type="checkbox" checked></th>
-						<th id="color74"  class=color><input type="checkbox" checked></th>
-					</tr>
-					<tr height="32">
-						<th></th>
-						<th></th>
-						<th></th>
-						<th id="color78"  class=color><input type="checkbox" checked></th>
-						<th id="color79"  class=color><input type="checkbox" checked></th>
-						<th id="color80"  class=color><input type="checkbox" checked></th>
-						<th id="color81"  class=color><input type="checkbox" checked></th>
-						<th id="color82"  class=color><input type="checkbox" checked></th>
-						<th id="color83"  class=color><input type="checkbox" checked></th>
-						<th id="color84"  class=color><input type="checkbox" checked></th>
-						<th id="color85"  class=color><input type="checkbox" checked></th>
-						<th id="color86"  class=color><input type="checkbox" checked></th>
-						<th id="color87"  class=color><input type="checkbox" checked></th>
-						<th id="color88"  class=color><input type="checkbox" checked></th>
-						<th id="color89"  class=color><input type="checkbox" checked></th>
-					</tr>
-					<tr height="32">
-						<th></th>
-						<th></th>
-						<th></th>
-						<th id="color93"  class=color><input type="checkbox" checked></th>
-						<th id="color94"  class=color><input type="checkbox" checked></th>
-						<th id="color95"  class=color><input type="checkbox" checked></th>
-						<th id="color96"  class=color><input type="checkbox" checked></th>
-						<th id="color97"  class=color><input type="checkbox" checked></th>
-						<th id="color98"  class=color><input type="checkbox" checked></th>
-						<th id="color99"  class=color><input type="checkbox" checked></th>
-						<th id="color100" class=color><input type="checkbox" checked></th>
-						<th id="color101" class=color><input type="checkbox" checked></th>
-						<th id="color102" class=color><input type="checkbox" checked></th>
-						<th id="color103" class=color><input type="checkbox" checked></th>
-						<th id="color104" class=color><input type="checkbox" checked></th>
-					</tr>
-					<tr height="32">
-						<th></th>
-						<th></th>
-						<th></th>
-						<th id="color108" class=color><input type="checkbox" checked></th>
-						<th id="color109" class=color><input type="checkbox" checked></th>
-						<th id="color110" class=color><input type="checkbox" checked></th>
-						<th id="color111" class=color><input type="checkbox" checked></th>
-						<th id="color112" class=color><input type="checkbox" checked></th>
-						<th id="color113" class=color><input type="checkbox" checked></th>
-						<th id="color114" class=color><input type="checkbox" checked></th>
-						<th id="color115" class=color><input type="checkbox" checked></th>
-						<th id="color116" class=color><input type="checkbox" checked></th>
-						<th id="color117" class=color><input type="checkbox" checked></th>
-						<th id="color118" class=color><input type="checkbox" checked></th>
-						<th id="color119" class=color><input type="checkbox" checked></th>
-					</tr>
-					<tr height="32">
-						<th></th>
-						<th></th>
-						<th></th>
-						<th id="color123" class=color><input type="checkbox" checked></th>
-						<th id="color124" class=color><input type="checkbox" checked></th>
-						<th id="color125" class=color><input type="checkbox" checked></th>
-						<th id="color126" class=color><input type="checkbox" checked></th>
-						<th id="color127" class=color><input type="checkbox" checked></th>
-						<th id="color128" class=color><input type="checkbox" checked></th>
-						<th id="color129" class=color><input type="checkbox" checked></th>
-						<th id="color130" class=color><input type="checkbox" checked></th>
-						<th id="color131" class=color><input type="checkbox" checked></th>
-						<th id="color132" class=color><input type="checkbox" checked></th>
-						<th id="color133" class=color><input type="checkbox" checked></th>
-						<th id="color134" class=color><input type="checkbox" checked></th>
-					</tr>
-				</table>
+			<br>
+			<div id="options" class="panel" style="display: none;">
+				<h2>Options</h2>
+				<fieldset>
+					<legend style="font-weight:bold;">Palette</legend>
+					<button id="select">Select All</button>&nbsp;&nbsp;<button id="deselect">Deselect All</button>
+					<div style="overflow-x: auto;">
+						<table>
+							<tr height="32">
+								<th id="color0"   class=color width="32"><input type="checkbox" checked></th>
+								<th id="color1"   class=color width="32"><input type="checkbox" checked></th>
+								<th id="color2"   class=color width="32"><input type="checkbox" checked></th>
+								<th id="color3"   class=color width="32"><input type="checkbox" checked></th>
+								<th id="color4"   class=color width="32"><input type="checkbox" checked></th>
+								<th id="color5"   class=color width="32"><input type="checkbox" checked></th>
+								<th id="color6"   class=color width="32"><input type="checkbox" checked></th>
+								<th id="color7"   class=color width="32"><input type="checkbox" checked></th>
+								<th id="color8"   class=color width="32"><input type="checkbox" checked></th>
+								<th id="color9"   class=color width="32"><input type="checkbox" checked></th>
+								<th id="color10"  class=color width="32"><input type="checkbox" checked></th>
+								<th id="color11"  class=color width="32"><input type="checkbox" checked></th>
+								<th id="color12"  class=color width="32"><input type="checkbox" checked></th>
+								<th id="color13"  class=color width="32"><input type="checkbox" checked></th>
+								<th id="color14"  class=color width="32"><input type="checkbox" checked></th>
+							</tr>
+							<tr height="32">
+								<th id="color15"  class=color><input type="checkbox" checked></th>
+								<th id="color16"  class=color><input type="checkbox" checked></th>
+								<th id="color17"  class=color><input type="checkbox" checked></th>
+								<th id="color18"  class=color><input type="checkbox" checked></th>
+								<th id="color19"  class=color><input type="checkbox" checked></th>
+								<th id="color20"  class=color><input type="checkbox" checked></th>
+								<th id="color21"  class=color><input type="checkbox" checked></th>
+								<th id="color22"  class=color><input type="checkbox" checked></th>
+								<th id="color23"  class=color><input type="checkbox" checked></th>
+								<th id="color24"  class=color><input type="checkbox" checked></th>
+								<th id="color25"  class=color><input type="checkbox" checked></th>
+								<th id="color26"  class=color><input type="checkbox" checked></th>
+								<th id="color27"  class=color><input type="checkbox" checked></th>
+								<th id="color28"  class=color><input type="checkbox" checked></th>
+								<th id="color29"  class=color><input type="checkbox" checked></th>
+							</tr>
+							<tr height="32">
+								<th id="color30"  class=color><input type="checkbox" checked></th>
+								<th id="color31"  class=color><input type="checkbox" checked></th>
+								<th id="color32"  class=color><input type="checkbox" checked></th>
+								<th id="color33"  class=color><input type="checkbox" checked></th>
+								<th id="color34"  class=color><input type="checkbox" checked></th>
+								<th id="color35"  class=color><input type="checkbox" checked></th>
+								<th id="color36"  class=color><input type="checkbox" checked></th>
+								<th id="color37"  class=color><input type="checkbox" checked></th>
+								<th id="color38"  class=color><input type="checkbox" checked></th>
+								<th id="color39"  class=color><input type="checkbox" checked></th>
+								<th id="color40"  class=color><input type="checkbox" checked></th>
+								<th id="color41"  class=color><input type="checkbox" checked></th>
+								<th id="color42"  class=color><input type="checkbox" checked></th>
+								<th id="color43"  class=color><input type="checkbox" checked></th>
+								<th id="color44"  class=color><input type="checkbox" checked></th>
+							</tr>
+							<tr height="32">
+								<th></th>
+								<th></th>
+								<th id="color47" class=color style="background-image: linear-gradient(45deg, #E0E0E0 25%, transparent 25%), linear-gradient(-45deg, #E0E0E0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #E0E0E0 75%), linear-gradient(-45deg, transparent 75%, #E0E0E0 75%); background-size: 12px 12px; background-position: 0 0, 0 6px, 6px -6px, -6px 0px;
+		"><input type="checkbox" checked></th>
+								<th id="color48"  class=color><input type="checkbox" checked></th>
+								<th id="color49"  class=color><input type="checkbox" checked></th>
+								<th id="color50"  class=color><input type="checkbox" checked></th>
+								<th id="color51"  class=color><input type="checkbox" checked></th>
+								<th id="color52"  class=color><input type="checkbox" checked></th>
+								<th id="color53"  class=color><input type="checkbox" checked></th>
+								<th id="color54"  class=color><input type="checkbox" checked></th>
+								<th id="color55"  class=color><input type="checkbox" checked></th>
+								<th id="color56"  class=color><input type="checkbox" checked></th>
+								<th id="color57"  class=color><input type="checkbox" checked></th>
+								<th id="color58"  class=color><input type="checkbox" checked></th>
+								<th id="color59"  class=color><input type="checkbox" checked></th>
+							</tr>
+							<tr height="32">
+								<th></th>
+								<th></th>
+								<th></th>
+								<th id="color63"  class=color><input type="checkbox" checked></th>
+								<th id="color64"  class=color><input type="checkbox" checked></th>
+								<th id="color65"  class=color><input type="checkbox" checked></th>
+								<th id="color66"  class=color><input type="checkbox" checked></th>
+								<th id="color67"  class=color><input type="checkbox" checked></th>
+								<th id="color68"  class=color><input type="checkbox" checked></th>
+								<th id="color69"  class=color><input type="checkbox" checked></th>
+								<th id="color70"  class=color><input type="checkbox" checked></th>
+								<th id="color71"  class=color><input type="checkbox" checked></th>
+								<th id="color72"  class=color><input type="checkbox" checked></th>
+								<th id="color73"  class=color><input type="checkbox" checked></th>
+								<th id="color74"  class=color><input type="checkbox" checked></th>
+							</tr>
+							<tr height="32">
+								<th></th>
+								<th></th>
+								<th></th>
+								<th id="color78"  class=color><input type="checkbox" checked></th>
+								<th id="color79"  class=color><input type="checkbox" checked></th>
+								<th id="color80"  class=color><input type="checkbox" checked></th>
+								<th id="color81"  class=color><input type="checkbox" checked></th>
+								<th id="color82"  class=color><input type="checkbox" checked></th>
+								<th id="color83"  class=color><input type="checkbox" checked></th>
+								<th id="color84"  class=color><input type="checkbox" checked></th>
+								<th id="color85"  class=color><input type="checkbox" checked></th>
+								<th id="color86"  class=color><input type="checkbox" checked></th>
+								<th id="color87"  class=color><input type="checkbox" checked></th>
+								<th id="color88"  class=color><input type="checkbox" checked></th>
+								<th id="color89"  class=color><input type="checkbox" checked></th>
+							</tr>
+							<tr height="32">
+								<th></th>
+								<th></th>
+								<th></th>
+								<th id="color93"  class=color><input type="checkbox" checked></th>
+								<th id="color94"  class=color><input type="checkbox" checked></th>
+								<th id="color95"  class=color><input type="checkbox" checked></th>
+								<th id="color96"  class=color><input type="checkbox" checked></th>
+								<th id="color97"  class=color><input type="checkbox" checked></th>
+								<th id="color98"  class=color><input type="checkbox" checked></th>
+								<th id="color99"  class=color><input type="checkbox" checked></th>
+								<th id="color100" class=color><input type="checkbox" checked></th>
+								<th id="color101" class=color><input type="checkbox" checked></th>
+								<th id="color102" class=color><input type="checkbox" checked></th>
+								<th id="color103" class=color><input type="checkbox" checked></th>
+								<th id="color104" class=color><input type="checkbox" checked></th>
+							</tr>
+							<tr height="32">
+								<th></th>
+								<th></th>
+								<th></th>
+								<th id="color108" class=color><input type="checkbox" checked></th>
+								<th id="color109" class=color><input type="checkbox" checked></th>
+								<th id="color110" class=color><input type="checkbox" checked></th>
+								<th id="color111" class=color><input type="checkbox" checked></th>
+								<th id="color112" class=color><input type="checkbox" checked></th>
+								<th id="color113" class=color><input type="checkbox" checked></th>
+								<th id="color114" class=color><input type="checkbox" checked></th>
+								<th id="color115" class=color><input type="checkbox" checked></th>
+								<th id="color116" class=color><input type="checkbox" checked></th>
+								<th id="color117" class=color><input type="checkbox" checked></th>
+								<th id="color118" class=color><input type="checkbox" checked></th>
+								<th id="color119" class=color><input type="checkbox" checked></th>
+							</tr>
+							<tr height="32">
+								<th></th>
+								<th></th>
+								<th></th>
+								<th id="color123" class=color><input type="checkbox" checked></th>
+								<th id="color124" class=color><input type="checkbox" checked></th>
+								<th id="color125" class=color><input type="checkbox" checked></th>
+								<th id="color126" class=color><input type="checkbox" checked></th>
+								<th id="color127" class=color><input type="checkbox" checked></th>
+								<th id="color128" class=color><input type="checkbox" checked></th>
+								<th id="color129" class=color><input type="checkbox" checked></th>
+								<th id="color130" class=color><input type="checkbox" checked></th>
+								<th id="color131" class=color><input type="checkbox" checked></th>
+								<th id="color132" class=color><input type="checkbox" checked></th>
+								<th id="color133" class=color><input type="checkbox" checked></th>
+								<th id="color134" class=color><input type="checkbox" checked></th>
+							</tr>
+						</table>
+					</div>
 				</fieldset>
-			<br>
-			<!-- 新しいフィールドセット: 色最適化オプション -->
-			<fieldset style="border:2px solid #808080; width:600px">
-				<legend style="font-weight:bold;">Color Optimization</legend>
-				<input type="checkbox" id="useColorOptimization"> Enable Color Optimization<br><br>
-				Number of Colors: <input type="number" id="colorCount" value="16" min="1" max="64" style="width:48px"><br><br>
-				<select id="optimizationMethod">
-					<option value="kmeans">K-means Clustering</option>
-					<option value="mediancut">Median Cut</option>
-					<option value="octree">Octree Quantization</option>
-				</select>
-				<button id="applyOptimization">Optimize Palette</button>
-			</fieldset>
-			<br>
-			<fieldset style="border:2px solid #808080; width:600px">
-				<legend style="font-weight:bold;">Scale</legend>
-				<input type="radio" id="scale0" name="scale" checked="checked">Scale Proportionally<br>
-				<input type="radio" id="scale1" name="scale">Scale to Fit<br><br>
-				Number of Textures: <input type="number" id="textx" value="1" style="width:48px"> × <input type="number" id="texty" value="1" style="width:48px">
-			</fieldset>
-			<br>
-			<fieldset style="border:2px solid #808080; width:600px">
-				<legend style="font-weight:bold;">Dithering</legend>
-				<input type="radio" id="dith0" name="dithering" checked="checked">Floyd Steinberg<br>
-				<input type="radio" id="dith1" name="dithering">Ordered<br>
-				<input type="radio" id="dith2" name="dithering">Random<br>
-				<input type="radio" id="dith3" name="dithering">None
-			</fieldset>
-			<br>
+				<br>
+				<fieldset>
+					<legend style="font-weight:bold;">Color Optimization</legend>
+					<label>
+						<input type="checkbox" id="useColorOptimization"> Enable Color Optimization
+					</label>
+					<p>
+						Number of Colors: 
+						<input type="number" id="colorCount" value="16" min="1" max="64" style="width:48px">
+					</p>
+					<p>
+						<select id="optimizationMethod">
+							<option value="kmeans">K-means Clustering</option>
+							<option value="mediancut">Median Cut</option>
+							<option value="octree">Octree Quantization</option>
+						</select>
+					</p>
+					<button id="applyOptimization">Optimize Palette</button>
+				</fieldset>
+				<br>
+				<fieldset>
+					<legend style="font-weight:bold;">Scale</legend>
+					<label>
+						<input type="radio" id="scale0" name="scale" checked="checked"> Scale Proportionally
+					</label>
+					<br>
+					<label>
+						<input type="radio" id="scale1" name="scale"> Scale to Fit
+					</label>
+					<br><br>
+					Number of Textures: 
+					<input type="number" id="textx" value="1" style="width:48px"> × 
+					<input type="number" id="texty" value="1" style="width:48px">
+				</fieldset>
+				<br>
+				<fieldset>
+					<legend style="font-weight:bold;">Dithering</legend>
+					<label>
+						<input type="radio" id="dith0" name="dithering" checked="checked"> Floyd Steinberg
+					</label>
+					<br>
+					<label>
+						<input type="radio" id="dith1" name="dithering"> Ordered
+					</label>
+					<br>
+					<label>
+						<input type="radio" id="dith2" name="dithering"> Random
+					</label>
+					<br>
+					<label>
+						<input type="radio" id="dith3" name="dithering"> None
+					</label>
+				</fieldset>
+				<br>
+			</div>
 		</div>
-			
+		
 		<script>
 			
 			window.onload = function () {
