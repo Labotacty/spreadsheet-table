@@ -167,22 +167,51 @@
     </div>
 
     <script>
-        const sheetID = "1Vn-LSQZHBdbfnjMfHDGD4Lqr30egE46MEQFrptIZRFc"; // スプレッドシートID
-        const apiKey = "AIzaSyDiQaxgz_ixPu6lzQXwdOPzgaKvflUfcio"; // Google APIキー
-        const range = "シート2!A1:G"; // 取得範囲
-        const version = "v0.0.6"; // ページバージョン
-
-        // スプレッドシートからセル値を取得するURL (A1セルにタイムスタンプを配置する想定)
-        const timestampUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/シート2!J1?key=${apiKey}`;
+        const webAppUrl = 'https://script.google.com/macros/s/AKfycbxXHfQ7WI3hSQrItJyG-iBn6IItql81YUNMu_rayyKe4gBDkl_ijrxyutGOEQZV2j_F/exec';
+        const version = "v0.0.7"; // ページバージョンを更新
         
-        // データ取得用のURL
-        const dataUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/${range}?key=${apiKey}`;
-
         let tableData = []; // データ保存用
         let sortOrder = {}; // ソート状態
-        const unsortableColumns = [6]; // ソート不可の列（6番目のID列をソート禁止）
-
-        // 日付をフォーマットする関数
+        const unsortableColumns = [6]; // ソート不可の列
+        
+        // データ取得関数
+        async function fetchDataFromAppScript() {
+            try {
+                // JSONPで呼び出し (CORS回避のため)
+                // キャッシュ防止のためにタイムスタンプを付与
+                const timestamp = new Date().getTime();
+                
+                return new Promise((resolve, reject) => {
+                    // スクリプトタグを作成
+                    const script = document.createElement('script');
+                    const callbackName = 'jsonpCallback_' + timestamp;
+                    
+                    // コールバック関数を定義
+                    window[callbackName] = function(data) {
+                        // 使い終わったスクリプトとコールバックを削除
+                        document.body.removeChild(script);
+                        delete window[callbackName];
+                        resolve(data);
+                    };
+                    
+                    // エラーハンドリング
+                    script.onerror = () => {
+                        document.body.removeChild(script);
+                        delete window[callbackName];
+                        reject(new Error('Apps Scriptの読み込みに失敗しました'));
+                    };
+                    
+                    // JSONP用URLを作成
+                    script.src = `${webAppUrl}?callback=${callbackName}&t=${timestamp}`;
+                    document.body.appendChild(script);
+                });
+            } catch (error) {
+                console.error("データ取得エラー:", error);
+                throw error;
+            }
+        }
+        
+        // 日付をフォーマットする関数 (既存の関数を再利用)
         function formatDate(dateString) {
             try {
                 // APIからの日付文字列をログに出力（デバッグ用）
@@ -211,68 +240,57 @@
                 return `${now.getFullYear()}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getDate().toString().padStart(2, '0')}`;
             }
         }
-
-        // スプレッドシートのメタデータを取得して更新日時を表示
-        // スプレッドシート内のセルから更新日を取得する代替アプローチ
-        // スプレッドシートのH1セルに「=TODAY()」または「=NOW()」関数を設定するか、
-        // Apps Scriptで自動的に更新日時を書き込む想定
-        fetch(timestampUrl)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`APIリクエストエラー: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log("タイムスタンプセルの応答:", data);
+        
+        // 初期化処理
+        async function initializeTable() {
+            try {
+                // Apps Scriptからデータを取得
+                const data = await fetchDataFromAppScript();
                 
+                if (!data || !data.values || data.values.length === 0) {
+                    throw new Error("データが見つかりません");
+                }
+                
+                // 更新日時を設定
+                const timestamp = data.timestamp;
                 let updatedTime;
-                if (data && data.values && data.values[0] && data.values[0][0]) {
-                    // セルの値を日付としてパース
-                    try {
-                        updatedTime = data.values[0][0];
-                        // 既に整形された日付文字列の場合はそのまま使用
-                        if (!/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(updatedTime)) {
-                            const parsedDate = new Date(updatedTime);
-                            if (!isNaN(parsedDate.getTime())) {
-                                updatedTime = formatDate(parsedDate);
-                            } else {
-                                throw new Error("無効な日付形式");
-                            }
+                
+                if (timestamp) {
+                    // 既に整形された日付文字列の場合はそのまま使用
+                    if (!/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(timestamp)) {
+                        try {
+                            updatedTime = formatDate(new Date(timestamp));
+                        } catch (e) {
+                            updatedTime = timestamp; // パースに失敗した場合はそのまま使用
                         }
-                    } catch (e) {
-                        console.warn("日付のパースに失敗:", e);
-                        updatedTime = data.values[0][0]; // パースに失敗した場合はセルの値をそのまま使用
+                    } else {
+                        updatedTime = timestamp;
                     }
                 } else {
-                    // セルの値が取得できない場合は現在の日付を使用
+                    // タイムスタンプがない場合は現在の日付を使用
                     updatedTime = formatDate(new Date()) + " (自動生成)";
                 }
                 
                 document.getElementById("updateInfo").textContent = `最終更新: ${updatedTime} | バージョン: ${version}`;
-            })
-            .catch(error => {
-                console.error("タイムスタンプ取得エラー:", error);
-                // エラー時はフォールバックの日付を表示
-                const fallbackDate = new Date().toLocaleDateString('ja-JP');
-                document.getElementById("updateInfo").textContent = `最終更新: ${fallbackDate} (推定) | バージョン: ${version}`;
-            });
-
-        // テーブルデータの取得
-        fetch(dataUrl)
-            .then(response => response.json())
-            .then(data => {
+                
+                // テーブルデータを保存
                 const rows = data.values;
-                if (!rows || rows.length === 0) {
-                    console.log("データが見つかりません");
-                    return;
-                }
-
-                tableData = rows.slice(1); // データ保存
+                tableData = rows.slice(1);
+                
+                // テーブルを作成
                 createTable(rows);
-            })
-            .catch(error => console.error("データ取得エラー:", error));
-
+            } catch (error) {
+                console.error("初期化エラー:", error);
+                document.getElementById("updateInfo").textContent = `エラーが発生しました | バージョン: ${version}`;
+                
+                // エラーメッセージを表示
+                const tableBody = document.getElementById("tableBody");
+                const tableHeader = document.getElementById("tableHeader");
+                tableHeader.innerHTML = "<th>状態</th>";
+                tableBody.innerHTML = `<tr><td>データの読み込みに失敗しました。後でもう一度お試しください。(${error.message})</td></tr>`;
+            }
+        }
+        
         function createTable(rows) {
             const tableHeader = document.getElementById("tableHeader");
             const tableBody = document.getElementById("tableBody");
