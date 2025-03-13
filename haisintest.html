@@ -172,8 +172,8 @@
         const range = "シート2!A1:G"; // 取得範囲
         const version = "v0.0.6"; // ページバージョン
 
-        // スプレッドシートのメタデータを取得するURL
-        const metadataUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}?key=${apiKey}`;
+        // スプレッドシートからセル値を取得するURL (A1セルにタイムスタンプを配置する想定)
+        const timestampUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/シート2!J1?key=${apiKey}`;
         
         // データ取得用のURL
         const dataUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/${range}?key=${apiKey}`;
@@ -213,46 +213,46 @@
         }
 
         // スプレッドシートのメタデータを取得して更新日時を表示
-        fetch(metadataUrl)
-            .then(response => response.json())
-            .then(metadata => {
-                console.log("取得したメタデータ:", metadata); // デバッグ用に全メタデータを出力
+        // スプレッドシート内のセルから更新日を取得する代替アプローチ
+        // スプレッドシートのH1セルに「=TODAY()」または「=NOW()」関数を設定するか、
+        // Apps Scriptで自動的に更新日時を書き込む想定
+        fetch(timestampUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`APIリクエストエラー: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log("タイムスタンプセルの応答:", data);
                 
-                // updatedTimeの取得と日付のフォーマット
                 let updatedTime;
-                if (metadata && metadata.properties && metadata.properties.updatedTime) {
-                    updatedTime = formatDate(metadata.properties.updatedTime);
-                } else if (metadata && metadata.lastUpdated) {
-                    updatedTime = formatDate(metadata.lastUpdated);
-                } else {
-                    // APIレスポンスの構造を確認
-                    console.log("日付情報の場所を探索中...");
-                    // API応答を再帰的に探索して日付らしき文字列を探す
-                    const findDateInObject = (obj, path = '') => {
-                        for (const key in obj) {
-                            if (typeof obj[key] === 'object' && obj[key] !== null) {
-                                findDateInObject(obj[key], `${path}.${key}`);
-                            } else if (
-                                typeof obj[key] === 'string' && 
-                                (key.toLowerCase().includes('time') || key.toLowerCase().includes('date')) &&
-                                /\d{4}-\d{2}-\d{2}/.test(obj[key])
-                            ) {
-                                console.log(`日付候補 [${path}.${key}]:`, obj[key]);
+                if (data && data.values && data.values[0] && data.values[0][0]) {
+                    // セルの値を日付としてパース
+                    try {
+                        updatedTime = data.values[0][0];
+                        // 既に整形された日付文字列の場合はそのまま使用
+                        if (!/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(updatedTime)) {
+                            const parsedDate = new Date(updatedTime);
+                            if (!isNaN(parsedDate.getTime())) {
+                                updatedTime = formatDate(parsedDate);
+                            } else {
+                                throw new Error("無効な日付形式");
                             }
                         }
-                    };
-                    findDateInObject(metadata);
-                    
-                    // 日付情報が見つからない場合は現在の日付を使用
-                    const now = new Date();
-                    updatedTime = formatDate(now.toISOString());
-                    updatedTime += " (自動生成)";
+                    } catch (e) {
+                        console.warn("日付のパースに失敗:", e);
+                        updatedTime = data.values[0][0]; // パースに失敗した場合はセルの値をそのまま使用
+                    }
+                } else {
+                    // セルの値が取得できない場合は現在の日付を使用
+                    updatedTime = formatDate(new Date()) + " (自動生成)";
                 }
                 
                 document.getElementById("updateInfo").textContent = `最終更新: ${updatedTime} | バージョン: ${version}`;
             })
             .catch(error => {
-                console.error("メタデータ取得エラー:", error);
+                console.error("タイムスタンプ取得エラー:", error);
                 // エラー時はフォールバックの日付を表示
                 const fallbackDate = new Date().toLocaleDateString('ja-JP');
                 document.getElementById("updateInfo").textContent = `最終更新: ${fallbackDate} (推定) | バージョン: ${version}`;
