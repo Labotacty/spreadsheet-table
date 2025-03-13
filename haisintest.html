@@ -144,7 +144,7 @@
 
     <h1 id="pageTitle">
         たくらぼ配信でプレイしたゲームリスト
-        <span id="updateInfo"></span>
+        <span id="updateInfo">読み込み中...</span>
     </h1>
     
     <p>
@@ -156,10 +156,6 @@
     <!-- 検索フィルター -->
     <input type="text" id="searchInput" placeholder="検索..." onkeyup="filterTable()">
     <p id="resultCount">🔍 検索結果: 0 件</p>
-
-    <!-- ランダムピックアップボタン -->
-    <button id="randomPickBtn">🎲 ランダムに5つピックアップ</button>
-    <button id="resetBtn" style="display: none;">🔄 元に戻す</button>
 
     <div class="table-container">
         <table id="sheetTable">
@@ -174,18 +170,43 @@
         const sheetID = "1Vn-LSQZHBdbfnjMfHDGD4Lqr30egE46MEQFrptIZRFc"; // スプレッドシートID
         const apiKey = "AIzaSyDiQaxgz_ixPu6lzQXwdOPzgaKvflUfcio"; // Google APIキー
         const range = "シート2!A1:G"; // 取得範囲
-        const formattedDate = "2025/02/01"; 
-        const version = "v0.0.4"; // ページバージョン
-        document.getElementById("updateInfo").textContent = `最終更新: ${formattedDate} | バージョン: ${version}`;
+        const version = "v0.0.6"; // ページバージョン
 
-
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/${range}?key=${apiKey}`;
+        // スプレッドシートのメタデータを取得するURL
+        const metadataUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}?key=${apiKey}`;
+        
+        // データ取得用のURL
+        const dataUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/${range}?key=${apiKey}`;
 
         let tableData = []; // データ保存用
         let sortOrder = {}; // ソート状態
         const unsortableColumns = [6]; // ソート不可の列（6番目のID列をソート禁止）
 
-        fetch(url)
+        // 日付をフォーマットする関数
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const year = date.getFullYear();
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const day = date.getDate().toString().padStart(2, '0');
+            return `${year}/${month}/${day}`;
+        }
+
+        // スプレッドシートのメタデータを取得して更新日時を表示
+        fetch(metadataUrl)
+            .then(response => response.json())
+            .then(metadata => {
+                const updatedTime = formatDate(metadata.properties.updatedTime);
+                document.getElementById("updateInfo").textContent = `最終更新: ${updatedTime} | バージョン: ${version}`;
+            })
+            .catch(error => {
+                console.error("メタデータ取得エラー:", error);
+                // エラー時はフォールバックの日付を表示
+                const fallbackDate = new Date().toLocaleDateString('ja-JP');
+                document.getElementById("updateInfo").textContent = `最終更新: ${fallbackDate} (推定) | バージョン: ${version}`;
+            });
+
+        // テーブルデータの取得
+        fetch(dataUrl)
             .then(response => response.json())
             .then(data => {
                 const rows = data.values;
@@ -226,7 +247,7 @@
 
         data.forEach(row => {
             const tr = document.createElement("tr");
-            for (let i = 0; i < data[0].length; i++) {
+            for (let i = 0; i < row.length; i++) {
                 const td = document.createElement("td");
                 td.innerHTML = row[i] !== undefined && row[i] !== "" ? row[i] : "&nbsp;"; // 空セル対策
                 tr.appendChild(td);
@@ -313,41 +334,7 @@
 
     // 🔹 検索フィールドのイベント設定
     document.getElementById("searchInput").addEventListener("input", filterTable);
-
-
-        document.getElementById("randomPickBtn").addEventListener("click", function () {
-        const rows = Array.from(document.querySelectorAll("#tableBody tr"));
-
-        if (rows.length === 0) return; // データがない場合は処理しない
-
-        // 🔹 ランダムに5つ選択
-        const randomRows = rows.sort(() => 0.5 - Math.random()).slice(0, 5);
-
-        // 🔹 すべて非表示にして、選ばれた5つだけ表示
-        rows.forEach(row => row.style.display = "none");
-        randomRows.forEach(row => row.style.display = "");
-
-        // 🔹 検索結果の件数を更新
-        document.getElementById("resultCount").textContent = `🎲 ランダム表示: ${randomRows.length} 件`;
-
-        // 🔹 リセットボタンを表示
-        document.getElementById("resetBtn").style.display = "inline-block";
-    });
-
-    document.getElementById("resetBtn").addEventListener("click", function () {
-        const rows = document.querySelectorAll("#tableBody tr");
-
-        // 🔹 すべての行を表示
-        rows.forEach(row => row.style.display = "");
-
-        // 🔹 検索結果の件数を全件に戻す
-        document.getElementById("resultCount").textContent = `🔍 検索結果: ${rows.length} 件`;
-
-        // 🔹 リセットボタンを非表示
-        this.style.display = "none";
-    });
-        
-  </script>
+    </script>
 
 </body>
 </html>
