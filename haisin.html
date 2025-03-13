@@ -138,13 +138,22 @@
                 width: 100%; /* 幅を100%にして表示させる */
             }
         }
+        
+        /* エラーメッセージスタイル */
+        .error-message {
+            color: red;
+            background-color: #ffeeee;
+            padding: 10px;
+            border: 1px solid red;
+            margin: 10px 0;
+        }
     </style>
 </head>
 <body>
 
     <h1 id="pageTitle">
         たくらぼ配信でプレイしたゲームリスト
-        <span id="updateInfo"></span>
+        <span id="updateInfo">読み込み中...</span>
     </h1>
     
     <p>
@@ -152,6 +161,9 @@
             📺 再生リストを見る
         </a>
     </p>
+    
+    <!-- エラーメッセージ表示領域 -->
+    <div id="errorArea"></div>
     
     <!-- 検索フィルター -->
     <input type="text" id="searchInput" placeholder="検索..." onkeyup="filterTable()">
@@ -167,95 +179,216 @@
     </div>
 
     <script>
-        const sheetID = "1Vn-LSQZHBdbfnjMfHDGD4Lqr30egE46MEQFrptIZRFc"; // スプレッドシートID
-        const apiKey = "AIzaSyDiQaxgz_ixPu6lzQXwdOPzgaKvflUfcio"; // Google APIキー
-        const range = "シート2!A1:G"; // 取得範囲
-        const formattedDate = "2025/03/09"; 
-        const version = "v0.0.5"; // ページバージョン
-        document.getElementById("updateInfo").textContent = `最終更新: ${formattedDate} | バージョン: ${version}`;
-
-
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/${range}?key=${apiKey}`;
-
+        // ==========================================
+        // ======== 正しいURL設定が最重要 ===========
+        // ==========================================
+        const webAppUrl = 'https://script.google.com/macros/s/AKfycbxXHfQ7WI3hSQrItJyG-iBn6IItql81YUNMu_rayyKe4gBDkl_ijrxyutGOEQZV2j_F/exec';
+        const version = "v0.1.0"; // バージョン更新
+        
         let tableData = []; // データ保存用
         let sortOrder = {}; // ソート状態
-        const unsortableColumns = [6]; // ソート不可の列（6番目のID列をソート禁止）
-
-        fetch(url)
-            .then(response => response.json())
-            .then(data => {
-                const rows = data.values;
-                if (!rows || rows.length === 0) {
-                    console.log("データが見つかりません");
-                    return;
+        const unsortableColumns = [6]; // ソート不可の列（6番目のID列）
+        
+        // エラーメッセージ表示
+        function showError(message) {
+            const errorArea = document.getElementById('errorArea');
+            errorArea.innerHTML = `<div class="error-message">${message}</div>`;
+            console.error(message);
+        }
+        
+        // データ取得関数 - シンプルバージョンのコードをベースに再構築
+        function loadDataWithJSONP() {
+            console.log("JSONPでデータ読み込み開始");
+            document.getElementById('updateInfo').textContent = "データを取得中...";
+            
+            // 一意のコールバック関数名を生成
+            const callbackName = 'jsonpCallback_' + new Date().getTime();
+            
+            // グローバルにコールバック関数を定義
+            window[callbackName] = function(data) {
+                console.log("データ受信成功");
+                
+                try {
+                    if (!data || !data.values || data.values.length === 0) {
+                        throw new Error("データが空または無効です");
+                    }
+                    
+                    // タイムスタンプ処理
+                    let updatedTime;
+                    if (data.timestamp) {
+                        try {
+                            const date = new Date(data.timestamp);
+                            if (!isNaN(date.getTime())) {
+                                updatedTime = formatDate(date);
+                            } else {
+                                updatedTime = data.timestamp;
+                            }
+                        } catch (e) {
+                            updatedTime = data.timestamp;
+                        }
+                    } else {
+                        updatedTime = formatDate(new Date()) + " (自動生成)";
+                    }
+                    
+                    document.getElementById("updateInfo").textContent = 
+                        `最終更新: ${updatedTime} | バージョン: ${version}`;
+                    
+                    // テーブル生成
+                    tableData = data.values.slice(1); // ヘッダー行を除くデータを保存
+                    createTable(data.values);
+                    document.getElementById('errorArea').innerHTML = ''; // エラーをクリア
+                } catch (error) {
+                    showError(`データ処理エラー: ${error.message}`);
                 }
+                
+                // 使い終わったコールバック関数を削除
+                delete window[callbackName];
+            };
+            
+            // script要素を作成
+            const script = document.createElement('script');
+            script.src = webAppUrl + '?callback=' + callbackName + '&t=' + new Date().getTime();
+            
+            // エラーハンドラーを設定
+            script.onerror = function(e) {
+                showError("スクリプト読み込みエラー: Google Apps ScriptのURLを確認してください。");
+                document.getElementById('updateInfo').textContent = 
+                    `エラーが発生しました | バージョン: ${version}`;
+                // 使い終わったコールバック関数を削除
+                delete window[callbackName];
+            };
+            
+            // ページにスクリプトを追加
+            document.body.appendChild(script);
+            
+            // 30秒後のタイムアウト処理
+            setTimeout(function() {
+                if (window[callbackName]) {
+                    showError("データ読み込みがタイムアウトしました。ネットワークまたはスクリプトURLを確認してください。");
+                    document.getElementById('updateInfo').textContent = 
+                        `タイムアウト | バージョン: ${version}`;
+                    delete window[callbackName];
+                }
+            }, 30000);
+        }
+        
+        // 日付フォーマット関数
+        function formatDate(date) {
+            try {
+                if (isNaN(date.getTime())) {
+                    throw new Error("無効な日付");
+                }
+                
+                const year = date.getFullYear();
+                const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                const day = date.getDate().toString().padStart(2, '0');
+                return `${year}/${month}/${day}`;
+            } catch (error) {
+                console.error("日付フォーマットエラー:", error);
+                const now = new Date();
+                return `${now.getFullYear()}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getDate().toString().padStart(2, '0')}`;
+            }
+        }
 
-                tableData = rows.slice(1); // データ保存
-                createTable(rows);
-            })
-            .catch(error => console.error("データ取得エラー:", error));
-
+        // テーブル作成関数
         function createTable(rows) {
+            if (!rows || rows.length === 0) {
+                showError("テーブルデータがありません");
+                return;
+            }
+            
             const tableHeader = document.getElementById("tableHeader");
-            const tableBody = document.getElementById("tableBody");
-
-            // ヘッダーを作成
+            tableHeader.innerHTML = ""; // ヘッダーをクリア
+            
+            // ヘッダー行の処理
             rows[0].forEach((header, index) => {
                 const th = document.createElement("th");
                 th.textContent = header;
-
-                // ソート禁止の列はクリックイベントを付けない
+                
+                // ソート不可の列はクリックイベントを付けない
                 if (!unsortableColumns.includes(index)) {
                     th.onclick = () => sortTable(index);
                     th.innerHTML += `<span class="sort-icon">▲▼</span>`;
                 }
-
+                
                 tableHeader.appendChild(th);
             });
-
+            
+            // データ行の処理
             renderTable(tableData);
+            
+            // 検索結果カウントの更新
+            document.getElementById("resultCount").textContent = 
+                `🔍 検索結果: ${tableData.length} 件`;
         }
-
-    function renderTable(data) {
-        const tableBody = document.getElementById("tableBody");
-        tableBody.innerHTML = ""; // テーブルをリセット
-
-        data.forEach(row => {
-            const tr = document.createElement("tr");
-            for (let i = 0; i < data[0].length; i++) {
-                const td = document.createElement("td");
-                td.innerHTML = row[i] !== undefined && row[i] !== "" ? row[i] : "&nbsp;"; // 空セル対策
-                tr.appendChild(td);
+        
+        function renderTable(data) {
+            const tableBody = document.getElementById("tableBody");
+            tableBody.innerHTML = ""; // テーブルをクリア
+            
+            if (!data || data.length === 0) {
+                tableBody.innerHTML = "<tr><td colspan='7'>データがありません</td></tr>";
+                return;
             }
-            tableBody.appendChild(tr);
-        });
-    }
-
+            
+            data.forEach(row => {
+                const tr = document.createElement("tr");
+                
+                // 各セルの作成
+                for (let i = 0; i < row.length; i++) {
+                    const td = document.createElement("td");
+                    
+                    // 値の変換・整形
+                    let cellValue = row[i];
+                    
+                    // 配信日の列（インデックス1）の場合は日付形式を変換
+                    if (i === 1 && cellValue) {
+                        // ISO日付文字列かどうかを判定
+                        if (typeof cellValue === 'string' && 
+                            cellValue.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+                            const date = new Date(cellValue);
+                            if (!isNaN(date.getTime())) {
+                                cellValue = formatDate(date);
+                            }
+                        }
+                    }
+                    
+                    td.innerHTML = cellValue !== undefined && cellValue !== "" ? cellValue : "&nbsp;";
+                    tr.appendChild(td);
+                }
+                
+                tableBody.appendChild(tr);
+            });
+        }
+        
         function sortTable(columnIndex) {
             // ソート不可の列なら処理しない
             if (unsortableColumns.includes(columnIndex)) return;
-
+            
             // 昇順・降順を切り替え
             const order = sortOrder[columnIndex] === "asc" ? "desc" : "asc";
             sortOrder[columnIndex] = order;
-
+            
+            // データのソート
             tableData.sort((a, b) => {
                 let valA = a[columnIndex] || "";
                 let valB = b[columnIndex] || "";
-
+                
+                // 数値の場合は数値としてソート
                 if (!isNaN(valA) && !isNaN(valB)) {
                     return order === "asc" ? valA - valB : valB - valA;
                 }
-
+                
+                // 文字列の場合は日本語対応のソート
                 return order === "asc"
-                    ? valA.localeCompare(valB, 'ja')
-                    : valB.localeCompare(valA, 'ja');
+                    ? String(valA).localeCompare(String(valB), 'ja')
+                    : String(valB).localeCompare(String(valA), 'ja');
             });
-
+            
             renderTable(tableData);
             updateSortIcons(columnIndex, order);
         }
-
+        
         function updateSortIcons(columnIndex, order) {
             document.querySelectorAll("th").forEach((th, index) => {
                 th.classList.toggle("sorted", index === columnIndex);
@@ -267,49 +400,81 @@
                 }
             });
         }
-
-    function filterTable() {
-        const searchText = document.getElementById("searchInput").value.toLowerCase();
-        const rows = document.querySelectorAll("#tableBody tr");
-        let matchCount = 0;
-
-        rows.forEach(row => {
-            let rowMatch = false;
-            const cells = row.getElementsByTagName("td");
-
-            for (let cell of cells) {
-                const text = cell.textContent || "";
-                const lowerText = text.toLowerCase();
-
-                if (searchText && lowerText.includes(searchText)) {
-                    rowMatch = true;
-                    // 🔹 ハイライト適用
-                    const regex = new RegExp(`(${searchText})`, "gi");
-                    cell.innerHTML = text.replace(regex, '<span class="highlight">$1</span>');
-                } else {
-                    cell.innerHTML = text; // 🔹 ハイライトを解除
+        
+        function filterTable() {
+            const searchText = document.getElementById("searchInput").value.toLowerCase();
+            
+            if (!tableData || tableData.length === 0) {
+                document.getElementById("resultCount").textContent = `🔍 検索結果: 0 件`;
+                return;
+            }
+            
+            const rows = document.querySelectorAll("#tableBody tr");
+            let matchCount = 0;
+            
+            rows.forEach(row => {
+                let rowMatch = false;
+                const cells = row.getElementsByTagName("td");
+                
+                // 検索キーワードで分割（スペース区切り）
+                const searchTerms = searchText.split(' ').filter(term => term.length > 0);
+                
+                if (searchTerms.length === 0) {
+                    // 検索ワードなしの場合は全表示
+                    row.style.display = "";
+                    matchCount++;
+                    
+                    // ハイライト解除
+                    Array.from(cells).forEach(cell => {
+                        cell.innerHTML = cell.textContent;
+                    });
+                    
+                    return;
                 }
+                
+                // 全てのキーワードが含まれているか（AND検索）
+                const rowText = Array.from(cells).map(cell => cell.textContent.toLowerCase()).join(' ');
+                rowMatch = searchTerms.every(term => rowText.includes(term));
+                
+                if (rowMatch) {
+                    row.style.display = "";
+                    matchCount++;
+                    
+                    // ハイライト処理
+                    Array.from(cells).forEach(cell => {
+                        let content = cell.textContent;
+                        
+                        searchTerms.forEach(term => {
+                            // 大文字小文字を区別せずにハイライト
+                            const regex = new RegExp(`(${term})`, "gi");
+                            content = content.replace(regex, '<span class="highlight">$1</span>');
+                        });
+                        
+                        cell.innerHTML = content;
+                    });
+                } else {
+                    row.style.display = "none";
+                }
+            });
+            
+            // 検索結果の件数を更新
+            document.getElementById("resultCount").textContent = `🔍 検索結果: ${matchCount} 件`;
+        }
+        
+        // ページ読み込み時の処理
+        document.addEventListener('DOMContentLoaded', function() {
+            // webAppUrl未設定のチェック
+            if (!webAppUrl || webAppUrl.includes('ここに実際のスクリプトID')) {
+                showError("Google Apps ScriptのURLが設定されていません。HTMLファイルを編集してwebAppUrlを設定してください。");
+                document.getElementById('updateInfo').textContent = 
+                    `設定が必要です | バージョン: ${version}`;
+                return;
             }
-
-            // 🔹 検索ボックスが空ならすべて表示
-            if (searchText === "") {
-                row.style.display = "";
-                matchCount = rows.length; // 全件表示
-            } else if (rowMatch) {
-                row.style.display = "";
-                matchCount++;
-            } else {
-                row.style.display = "none";
-            }
+            
+            console.log("ページ読み込み完了、データ取得を開始します");
+            // データ取得開始
+            loadDataWithJSONP();
         });
-
-        // 🔹 検索結果の件数を更新
-        document.getElementById("resultCount").textContent = `🔍 検索結果: ${matchCount} 件`;
-    }
-
-    // 🔹 検索フィールドのイベント設定
-    document.getElementById("searchInput").addEventListener("input", filterTable);
-  
     </script>
 
 </body>
