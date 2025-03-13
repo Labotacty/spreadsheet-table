@@ -184,18 +184,71 @@
 
         // 日付をフォーマットする関数
         function formatDate(dateString) {
-            const date = new Date(dateString);
-            const year = date.getFullYear();
-            const month = (date.getMonth() + 1).toString().padStart(2, '0');
-            const day = date.getDate().toString().padStart(2, '0');
-            return `${year}/${month}/${day}`;
+            try {
+                // APIからの日付文字列をログに出力（デバッグ用）
+                console.log("API返却日付:", dateString);
+                
+                // 日付文字列が有効かチェック
+                if (!dateString) {
+                    throw new Error("日付文字列が無効です");
+                }
+                
+                const date = new Date(dateString);
+                
+                // 有効な日付オブジェクトかチェック
+                if (isNaN(date.getTime())) {
+                    throw new Error("無効な日付形式です");
+                }
+                
+                const year = date.getFullYear();
+                const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                const day = date.getDate().toString().padStart(2, '0');
+                return `${year}/${month}/${day}`;
+            } catch (error) {
+                console.error("日付フォーマットエラー:", error);
+                // エラーの場合は現在の日付を返す
+                const now = new Date();
+                return `${now.getFullYear()}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getDate().toString().padStart(2, '0')}`;
+            }
         }
 
         // スプレッドシートのメタデータを取得して更新日時を表示
         fetch(metadataUrl)
             .then(response => response.json())
             .then(metadata => {
-                const updatedTime = formatDate(metadata.properties.updatedTime);
+                console.log("取得したメタデータ:", metadata); // デバッグ用に全メタデータを出力
+                
+                // updatedTimeの取得と日付のフォーマット
+                let updatedTime;
+                if (metadata && metadata.properties && metadata.properties.updatedTime) {
+                    updatedTime = formatDate(metadata.properties.updatedTime);
+                } else if (metadata && metadata.lastUpdated) {
+                    updatedTime = formatDate(metadata.lastUpdated);
+                } else {
+                    // APIレスポンスの構造を確認
+                    console.log("日付情報の場所を探索中...");
+                    // API応答を再帰的に探索して日付らしき文字列を探す
+                    const findDateInObject = (obj, path = '') => {
+                        for (const key in obj) {
+                            if (typeof obj[key] === 'object' && obj[key] !== null) {
+                                findDateInObject(obj[key], `${path}.${key}`);
+                            } else if (
+                                typeof obj[key] === 'string' && 
+                                (key.toLowerCase().includes('time') || key.toLowerCase().includes('date')) &&
+                                /\d{4}-\d{2}-\d{2}/.test(obj[key])
+                            ) {
+                                console.log(`日付候補 [${path}.${key}]:`, obj[key]);
+                            }
+                        }
+                    };
+                    findDateInObject(metadata);
+                    
+                    // 日付情報が見つからない場合は現在の日付を使用
+                    const now = new Date();
+                    updatedTime = formatDate(now.toISOString());
+                    updatedTime += " (自動生成)";
+                }
+                
                 document.getElementById("updateInfo").textContent = `最終更新: ${updatedTime} | バージョン: ${version}`;
             })
             .catch(error => {
