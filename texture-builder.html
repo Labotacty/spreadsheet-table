@@ -8,6 +8,8 @@
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 		<link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet">
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 		<style>
 			* { 
 				font-family: "Varela Round", sans-serif; 
@@ -48,7 +50,8 @@
 			}
 			#image, #canvas {
 				max-width: 100%;
-				height: auto;
+				max-height: 300px;
+				object-fit: contain; /* アスペクト比を維持しながら指定領域に収める */
 				border: 2px solid black;
 			}
 			
@@ -60,6 +63,15 @@
 				table {
 					display: block;
 					overflow-x: auto;
+					width: 100%;
+					max-width: 100%;
+				}
+				.color {
+					width: 28px;
+					height: 28px;
+				}
+				input[type="checkbox"] {
+					margin: 9px;
 				}
 				button {
 					padding: 8px;
@@ -75,8 +87,11 @@
 					margin: 10px;
 				}
 				.color {
-					width: 25px;
-					height: 25px;
+					width: 24px;
+					height: 24px;
+				}
+				input[type="checkbox"] {
+					margin: 7px;
 				}
 			}
 		</style>
@@ -455,7 +470,6 @@
 				});
 				
 				function download(type) {
-					
 					var canvas = document.getElementById("canvas");
 					var context = canvas.getContext("2d");
 					var image = context.getImageData(0, 0, canvas.width, canvas.height);
@@ -463,7 +477,9 @@
 					var sizeX = canvas.width / 64;
 					var sizeY = canvas.height / 64;
 					
-					var grid = new Uint8Array(4097);
+					// Check if we need to create a ZIP file (multiple textures)
+					var needsZip = (sizeX * sizeY > 1);
+					var zip = needsZip ? new JSZip() : null;
 					
 					var colorCompare = [];
 					var colorNumbers = [];
@@ -476,14 +492,10 @@
 						}
 					}
 					
-					var downloadCount = 0;
+					// Process each texture
 					for (var v = 0; v < sizeY; v++) {
 						for (var u = 0; u < sizeX; u++) {
-							
-							if (downloadCount > 0 && (downloadCount % 10) == 0) {
-								alert("Click OK to download the next set of images.");
-							}
-							downloadCount += 1;
+							var grid = new Uint8Array(4097);
 							
 							colorCount.fill(0);
 							for (var x = 0; x < 64; x++)  {
@@ -514,31 +526,56 @@
 								}
 							}
 							
-							var downloadLink = document.createElement("a");
-							var ext, blob;
+							// Determine file name
+							var fileNameWithExt;
+							if (sizeX + sizeY == 2) {    
+								fileNameWithExt = filename + (type == 1 ? ".csv" : ".GTD");
+							} else {
+								fileNameWithExt = filename + " " + (u + 1) + "-" + (v + 1) + (type == 1 ? ".csv" : ".GTD");
+							}
+							
+							// Create file content
+							var fileContent;
 							if (type == 1) {
-								ext = ".csv";
-								blob = new Blob(["\ufeff", grid.join(",")]);
+								fileContent = "\ufeff" + grid.join(",");
 							} else {
-								ext = ".GTD";
-								blob = new Blob([grid], {type: "application/octet-stream"});
+								fileContent = grid;
 							}
 							
-							var url = URL.createObjectURL(blob);
-							downloadLink.href = url;
-							if (sizeX + sizeY == 2) {	
-								downloadLink.download = filename + ext;
+							// Add to zip if needed, otherwise download directly
+							if (needsZip) {
+								if (type == 1) {
+									zip.file(fileNameWithExt, fileContent);
+								} else {
+									zip.file(fileNameWithExt, fileContent, {binary: true});
+								}
 							} else {
-								downloadLink.download = filename + " " + (u + 1) + "-" + (v + 1) + ext;
+								var blob;
+								if (type == 1) {
+									blob = new Blob([fileContent], {type: "text/csv;charset=utf-8"});
+								} else {
+									blob = new Blob([fileContent.buffer], {type: "application/octet-stream"});
+								}
+								
+								var url = URL.createObjectURL(blob);
+								var downloadLink = document.createElement("a");
+								downloadLink.href = url;
+								downloadLink.download = fileNameWithExt;
+								document.body.appendChild(downloadLink);
+								downloadLink.click();
+								document.body.removeChild(downloadLink);
+								URL.revokeObjectURL(url); // Clean up
 							}
-
-							document.body.appendChild(downloadLink);
-							downloadLink.click();
-							document.body.removeChild(downloadLink);
-							
 						}
 					}
 					
+					// If multiple textures, download as ZIP
+					if (needsZip) {
+						zip.generateAsync({type: "blob"}).then(function(content) {
+							var zipFileName = filename + (type == 1 ? "_csv.zip" : "_GTD.zip");
+							saveAs(content, zipFileName);
+						});
+					}
 				}
 				
 				// 色の最適化機能
