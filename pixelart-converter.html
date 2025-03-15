@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>64×64ピクセルアート変換ツール</title>
+  <style>
+    body {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+      color: #333;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      color: #2c3e50;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      background-color: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .upload-section {
+      text-align: center;
+      padding: 20px;
+      border: 2px dashed #ccc;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .upload-section:hover {
+      border-color: #3498db;
+      background-color: #f7f9fc;
+    }
+    .upload-section p {
+      margin: 10px 0;
+      color: #7f8c8d;
+    }
+    #fileInput {
+      display: none;
+    }
+    .preview-section {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-around;
+      gap: 20px;
+    }
+    .preview-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    canvas {
+      background-color: #fff;
+      border: 1px solid #ddd;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-radius: 5px;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-width: 200px;
+    }
+    label {
+      margin-bottom: 5px;
+      font-weight: bold;
+      color: #2c3e50;
+    }
+    input[type="range"], select {
+      width: 100%;
+    }
+    input[type="checkbox"] {
+      margin-right: 5px;
+    }
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+    .download-btn {
+      margin-top: 20px;
+      background-color: #27ae60;
+    }
+    .download-btn:hover {
+      background-color: #219955;
+    }
+    .pixel-size-display {
+      margin-top: 5px;
+      font-size: 12px;
+      color: #7f8c8d;
+    }
+  </style>
+</head>
+<body>
+  <h1>64×64ピクセルアート変換ツール</h1>
+  
+  <div class="container">
+    <div class="upload-section" id="uploadSection">
+      <p>ここに画像をドラッグ＆ドロップするか、クリックして選択</p>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+    
+    <div class="controls">
+      <div class="control-group">
+        <label for="colorCount">色数:</label>
+        <input type="range" id="colorCount" min="2" max="32" value="16" oninput="updateColorCountDisplay()">
+        <div id="colorCountDisplay">16色</div>
+      </div>
+      
+      <div class="control-group">
+        <label for="contrastLevel">コントラスト:</label>
+        <input type="range" id="contrastLevel" min="0.2" max="2.0" value="1.0" step="0.1" oninput="updateContrastDisplay()">
+        <div id="contrastDisplay">1.0</div>
+      </div>
+      
+      <div class="control-group">
+        <label for="edgeDetection">エッジ検出強度:</label>
+        <input type="range" id="edgeDetection" min="0" max="200" value="20">
+      </div>
+      
+      <div class="control-group">
+        <label for="pixelStyle">ピクセルスタイル:</label>
+        <select id="pixelStyle">
+          <option value="normal">標準</option>
+          <option value="round">角丸</option>
+          <option value="outlined">アウトライン強調 (外周)</option>
+        </select>
+      </div>
+      
+      <div class="control-group" id="outlineStrengthGroup" style="display: none;">
+        <label for="outlineStrength">アウトライン強度:</label>
+        <input type="range" id="outlineStrength" min="1" max="100" value="20">
+      </div>
+      
+      <div class="control-group">
+        <label>
+          <input type="checkbox" id="dithering"> ディザリング効果
+        </label>
+      </div>
+      
+      <div class="control-group">
+        <button id="convertBtn" disabled>変換</button>
+      </div>
+    </div>
+    
+    <div class="preview-section">
+      <div class="preview-container">
+        <h3>元画像</h3>
+        <canvas id="originalCanvas" width="200" height="200"></canvas>
+      </div>
+      
+      <div class="preview-container">
+        <h3>ピクセルアート (64×64)</h3>
+        <canvas id="pixelCanvas" width="64" height="64"></canvas>
+        <div class="pixel-size-display">実サイズ (64×64)</div>
+        <canvas id="previewCanvas" width="256" height="256"></canvas>
+        <div class="pixel-size-display">拡大表示 (4倍)</div>
+        <button id="downloadBtn" class="download-btn" disabled>ピクセルアートを保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let originalImage = null;
+    
+    // DOM要素の取得
+    const fileInput = document.getElementById('fileInput');
+    const uploadSection = document.getElementById('uploadSection');
+    const originalCanvas = document.getElementById('originalCanvas');
+    const pixelCanvas = document.getElementById('pixelCanvas');
+    const previewCanvas = document.getElementById('previewCanvas');
+    const convertBtn = document.getElementById('convertBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const colorCountSlider = document.getElementById('colorCount');
+    const colorCountDisplay = document.getElementById('colorCountDisplay');
+    const contrastLevelSlider = document.getElementById('contrastLevel');
+    const contrastDisplay = document.getElementById('contrastDisplay');
+    const edgeDetectionSlider = document.getElementById('edgeDetection');
+    const pixelStyleSelect = document.getElementById('pixelStyle');
+    const outlineStrengthSlider = document.getElementById('outlineStrength');
+    const outlineStrengthGroup = document.getElementById('outlineStrengthGroup');
+    const ditheringCheckbox = document.getElementById('dithering');
+    
+    // ピクセルスタイル選択の変更イベント - 正しい位置に移動
+    pixelStyleSelect.addEventListener('change', function() {
+      // アウトライン強調が選択された場合のみ強度スライダーを表示
+      if (this.value === 'outlined') {
+        outlineStrengthGroup.style.display = 'flex';
+      } else {
+        outlineStrengthGroup.style.display = 'none';
+      }
+    });
+    
+    // アップロードエリアのイベント
+    uploadSection.addEventListener('click', () => {
+      fileInput.click();
+    });
+    
+    uploadSection.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadSection.style.borderColor = '#3498db';
+      uploadSection.style.backgroundColor = '#f7f9fc';
+    });
+    
+    uploadSection.addEventListener('dragleave', () => {
+      uploadSection.style.borderColor = '#ccc';
+      uploadSection.style.backgroundColor = '';
+    });
+    
+    uploadSection.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadSection.style.borderColor = '#ccc';
+      uploadSection.style.backgroundColor = '';
+      
+      if (e.dataTransfer.files.length) {
+        handleFileUpload(e.dataTransfer.files[0]);
+      }
+    });
+    
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length) {
+        handleFileUpload(fileInput.files[0]);
+      }
+    });
+    
+    // 表示の更新関数
+    function updateColorCountDisplay() {
+      colorCountDisplay.textContent = `${colorCountSlider.value}色`;
+    }
+    
+    function updateContrastDisplay() {
+      contrastDisplay.textContent = contrastLevelSlider.value;
+    }
+    
+    // 画像アップロード処理
+    function handleFileUpload(file) {
+      if (!file.type.match('image.*')) {
+        alert('画像ファイルを選択してください');
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        originalImage = new Image();
+        originalImage.onload = () => {
+          drawOriginalImage();
+          convertBtn.disabled = false;
+        };
+        originalImage.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+    
+    // 元画像の描画
+    function drawOriginalImage() {
+      const ctx = originalCanvas.getContext('2d');
+      
+      // キャンバスサイズを調整（アスペクト比を維持）
+      const maxSize = 200;
+      let width = originalImage.width;
+      let height = originalImage.height;
+      
+      if (width > height) {
+        if (width > maxSize) {
+          height = height * (maxSize / width);
+          width = maxSize;
+        }
+      } else {
+        if (height > maxSize) {
+          width = width * (maxSize / height);
+          height = maxSize;
+        }
+      }
+      
+      originalCanvas.width = width;
+      originalCanvas.height = height;
+      
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(originalImage, 0, 0, width, height);
+    }
+    
+    // 変換ボタンのイベント
+    convertBtn.addEventListener('click', convertToPixelArt);
+    
+    // ピクセルアートへの変換
+    function convertToPixelArt() {
+      if (!originalImage) return;
+      
+      // 元画像を一時キャンバスに描画
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d');
+      tempCanvas.width = originalImage.width;
+      tempCanvas.height = originalImage.height;
+      tempCtx.drawImage(originalImage, 0, 0);
+      
+      // コントラスト調整
+      const contrastLevel = parseFloat(contrastLevelSlider.value);
+      if (contrastLevel !== 1.0) {
+        applyContrast(tempCtx, tempCanvas.width, tempCanvas.height, contrastLevel);
+      }
+      
+      // エッジ検出
+      const edgeStrength = edgeDetectionSlider.value / 100;
+      if (edgeStrength > 0) {
+        applyEdgeDetection(tempCtx, tempCanvas.width, tempCanvas.height, edgeStrength);
+      }
+      
+      // 64x64にリサイズ
+      const pixelCtx = pixelCanvas.getContext('2d');
+      pixelCtx.imageSmoothingEnabled = false;
+      
+      // 長辺をベースにアスペクト比を維持し、画像全体が収まるようにリサイズ
+      let sourceX = 0, sourceY = 0, sourceWidth = tempCanvas.width, sourceHeight = tempCanvas.height;
+      let targetWidth = 64, targetHeight = 64;
+      
+      // 長辺に合わせて短辺のサイズを計算
+      if (sourceWidth > sourceHeight) {
+        // 幅が長い場合（横長の画像）
+        const ratio = sourceHeight / sourceWidth;
+        targetWidth = 64;
+        targetHeight = Math.floor(64 * ratio);
+      } else {
+        // 高さが長い場合（縦長の画像）
+        const ratio = sourceWidth / sourceHeight;
+        targetHeight = 64;
+        targetWidth = Math.floor(64 * ratio);
+      }
+      
+      // 中央に配置するためのオフセット計算
+      const offsetX = Math.floor((64 - targetWidth) / 2);
+      const offsetY = Math.floor((64 - targetHeight) / 2);
+      
+      // キャンバスをクリア（透明または背景色で塗りつぶし）
+      pixelCtx.clearRect(0, 0, 64, 64);
+      
+      // まず全体を透明または任意の背景色で塗りつぶす（オプション）
+      // pixelCtx.fillStyle = 'rgba(255, 255, 255, 0)'; // 透明な背景
+      // pixelCtx.fillRect(0, 0, 64, 64);
+      
+      // 計算されたサイズとオフセットを使用して画像を描画
+      pixelCtx.drawImage(
+        tempCanvas, 
+        sourceX, sourceY, sourceWidth, sourceHeight, 
+        offsetX, offsetY, targetWidth, targetHeight
+      );
+      
+      // 色の量子化
+      const colorCount = parseInt(colorCountSlider.value);
+      const useDithering = ditheringCheckbox.checked;
+      quantizeColors(pixelCtx, 64, 64, colorCount, useDithering);
+      
+      // ピクセルスタイルの適用
+      const pixelStyle = pixelStyleSelect.value;
+      if (pixelStyle !== 'normal') {
+        // アウトライン強調の場合、強度の値を渡す
+        const outlineStrength = pixelStyle === 'outlined' ? outlineStrengthSlider.value : 30;
+        applyPixelStyle(pixelCtx, pixelStyle, outlineStrength);
+      }
+      
+      // プレビュー用に拡大表示
+      const previewCtx = previewCanvas.getContext('2d');
+      previewCtx.imageSmoothingEnabled = false;
+      previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+      previewCtx.drawImage(pixelCanvas, 0, 0, previewCanvas.width, previewCanvas.height);
+      
+      // ダウンロードボタンを有効化
+      downloadBtn.disabled = false;
+    }
+    
+    // コントラスト調整
+    function applyContrast(ctx, width, height, level) {
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+      
+      // コントラスト調整レベルを使用
+      const normalizedLevel = level;
+      
+      for (let i = 0; i < data.length; i += 4) {
+        // 各色チャネルに対して調整
+        for (let j = 0; j < 3; j++) {
+          // 0〜255の範囲を-0.5〜0.5の範囲に正規化
+          const normalizedColor = data[i + j] / 255 - 0.5;
+          // コントラスト適用
+          const adjustedColor = normalizedColor * normalizedLevel;
+          // -0.5〜0.5の範囲を0〜255に戻す
+          data[i + j] = clamp((adjustedColor + 0.5) * 255);
+        }
+      }
+      
+      ctx.putImageData(imageData, 0, 0);
+    }
+    
+    // エッジ検出
+    function applyEdgeDetection(ctx, width, height, strength) {
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+      const output = new Uint8ClampedArray(data);
+      
+      // 簡易的なSobelフィルタ
+      for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+          const idx = (y * width + x) * 4;
+          
+          // 周囲のピクセルの取得
+          const tl = getGrayscale(data, (y - 1) * width + (x - 1), width, height);
+          const t = getGrayscale(data, (y - 1) * width + x, width, height);
+          const tr = getGrayscale(data, (y - 1) * width + (x + 1), width, height);
+          const l = getGrayscale(data, y * width + (x - 1), width, height);
+          const r = getGrayscale(data, y * width + (x + 1), width, height);
+          const bl = getGrayscale(data, (y + 1) * width + (x - 1), width, height);
+          const b = getGrayscale(data, (y + 1) * width + x, width, height);
+          const br = getGrayscale(data, (y + 1) * width + (x + 1), width, height);
+          
+          // X方向とY方向の勾配
+          const gx = -tl - 2 * l - bl + tr + 2 * r + br;
+          const gy = -tl - 2 * t - tr + bl + 2 * b + br;
+          
+          // 勾配の大きさ
+          const g = Math.sqrt(gx * gx + gy * gy);
+          
+          // エッジの強調
+          const edgeFactor = Math.min(g * strength, 255);
+          
+          // 元の色とエッジを混合
+          output[idx] = clamp(data[idx] - edgeFactor);
+          output[idx + 1] = clamp(data[idx + 1] - edgeFactor);
+          output[idx + 2] = clamp(data[idx + 2] - edgeFactor);
+        }
+      }
+      
+      ctx.putImageData(new ImageData(output, width, height), 0, 0);
+    }
+    
+    // グレースケール変換（輝度計算）
+    function getGrayscale(data, idx, width, height) {
+      idx *= 4;
+      if (idx < 0 || idx >= data.length) return 0;
+      return (data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114);
+    }
+    
+    // 色の量子化（パレット使用）
+    function quantizeColors(ctx, width, height, colorCount, useDithering) {
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+      
+      // 指定されたカラーパレット（HEX形式から RGB 形式に変換）
+      const colorPalette = [
+        "ffffffff", "edededff", "d9d9d9ff", "f3e6ffff", "dcb3ffff", "c685ffff", "e6fbffff", "ccf7ffff", "85ebffff", "f7ffe6ff", "e6ffb3ff", "d6ff85ff", "ffe6e6ff", "ffb3b3ff", "ff8585ff", 
+        "b5b5b5ff", "909090ff", "6c6c6cff", "8800ffff", "520099ff", "29004dff", "00d5ffff", "00aaccff", "006b80ff", "aaff00ff", "90d900ff", "558000ff", "ff0000ff", "cc0012ff", "800000ff", 
+        "484848ff", "303030ff", "000000ff", "bb98d9ff", "846d99ff", "5b5266ff", "98ced9ff", "5a7a80ff", "36484dff", "c4d998ff", "89996cff", "3d4d1fff", "d95757ff", "804040ff", "4d1f1fff", 
+        "00000000", "fee6ffff", "fbb3ffff", "f985ffff", "e6f2ffff", "b3d6ffff", "85beffff", "ccffd3ff", "99ffaaff", "66ff7eff", "fff0e6ff", "ffd3b3ff", "ffb885ff", "f200ffff", "c200ccff", 
+        "7a0080ff", "1080ffff", "005fccff", "003c80ff", "00D924ff", "009919ff", "00590eff", "ff6a00ff", "cc5500ff", "803500ff", "d698d9ff", "7d4080ff", "4b1f4dff", "98b6d9ff", "405e80ff", 
+        "1f344dff", "86bf90ff", "598060ff", "1f3323ff", "d9b398ff", "805b40ff", "4d321fff", "ffe6f5ff", "ffb3dfff", "ff85ccff", "e8e6ffff", "d0ccffff", "a199ffff", "e6fffaff", "b3fff0ff", 
+        "85ffe7ff", "fffde6ff", "fffab3ff", "fff785ff", "ff0095ff", "cc0077ff", "80004bff", "1500ffff", "0f00b3ff", "07004dff", "00ffcfff", "00cca3ff", "008066ff", "ffee00ff", "ccbe00ff", 
+        "807700ff", "d998beff", "80536dff", "4d1f3aff", "b2aed9ff", "656282ff", "3b3a4dff", "98d9ccff", "6b9990ff", "1f4d43ff", "bfbb86ff", "807e5aff", "4d4b32ff"
+      ].map(hex => {
+        // HEX形式からRGBA形式に変換
+        return {
+          r: parseInt(hex.substring(0, 2), 16),
+          g: parseInt(hex.substring(2, 4), 16),
+          b: parseInt(hex.substring(4, 6), 16),
+          a: parseInt(hex.substring(6, 8), 16)
+        };
+      });
+      
+      // 画像全体の色を分析して、最適な色のサブセットを選ぶ
+      const optimizedPalette = selectOptimalColors(data, colorPalette, colorCount, width, height);
+      
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const idx = (y * width + x) * 4;
+          
+          // 元の色
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+          const a = data[idx + 3];
+          
+          // 最適化されたパレットから最も近い色を見つける
+          let closestColor = findClosestColor(r, g, b, a, optimizedPalette);
+          
+          // 色を適用
+          data[idx] = closestColor.r;
+          data[idx + 1] = closestColor.g;
+          data[idx + 2] = closestColor.b;
+          data[idx + 3] = closestColor.a;
+          
+          // ディザリング処理
+          if (useDithering) {
+            // 誤差計算
+            const errR = r - closestColor.r;
+            const errG = g - closestColor.g;
+            const errB = b - closestColor.b;
+            const errA = a - closestColor.a;
+            
+            // 誤差拡散（Floyd-Steinberg）
+            if (x < width - 1) {
+              addError(data, (y * width + (x + 1)) * 4, errR, errG, errB, errA, 7/16);
+            }
+            if (y < height - 1) {
+              if (x > 0) {
+                addError(data, ((y + 1) * width + (x - 1)) * 4, errR, errG, errB, errA, 3/16);
+              }
+              addError(data, ((y + 1) * width + x) * 4, errR, errG, errB, errA, 5/16);
+              if (x < width - 1) {
+                addError(data, ((y + 1) * width + (x + 1)) * 4, errR, errG, errB, errA, 1/16);
+              }
+            }
+          }
+        }
+      }
+      
+      ctx.putImageData(imageData, 0, 0);
+    }
+    
+    // 画像の色を分析して最適なパレットの色を選択する
+    function selectOptimalColors(imageData, fullPalette, colorCount, width, height) {
+      // 透明色は常に含める
+      const transparentColor = fullPalette.find(c => c.a === 0) || { r: 0, g: 0, b: 0, a: 0 };
+      let selectedPalette = [transparentColor];
+      
+      // 残りの選択可能な色数
+      const remainingColors = colorCount - 1;
+      
+      // 画像が使っている色の頻度を数える
+      const colorFrequency = new Map(); // キー: "r,g,b,a", 値: 頻度
+      
+      // 画像のサンプリング（パフォーマンスのため画像全体の10%をサンプリング）
+      const samplingStep = 3; // 3ピクセルごとにサンプリング
+      
+      for (let y = 0; y < height; y += samplingStep) {
+        for (let x = 0; x < width; x += samplingStep) {
+          const idx = (y * width + x) * 4;
+          
+          const r = imageData[idx];
+          const g = imageData[idx + 1];
+          const b = imageData[idx + 2];
+          const a = imageData[idx + 3];
+          
+          // 透明に近い場合はスキップ
+          if (a < 128) continue;
+          
+          // 各ピクセルに対して、パレットで最も近い色を見つける
+          const closestPaletteColor = findClosestColor(r, g, b, a, fullPalette);
+          const colorKey = `${closestPaletteColor.r},${closestPaletteColor.g},${closestPaletteColor.b},${closestPaletteColor.a}`;
+          
+          // 頻度を更新
+          if (colorFrequency.has(colorKey)) {
+            colorFrequency.set(colorKey, colorFrequency.get(colorKey) + 1);
+          } else {
+            colorFrequency.set(colorKey, 1);
+          }
+        }
+      }
+      
+      // 頻度に基づいて色をソートし、上位の色を選択
+      const sortedColors = Array.from(colorFrequency.entries())
+        .sort((a, b) => b[1] - a[1]) // 頻度で降順ソート
+        .map(entry => {
+          const [r, g, b, a] = entry[0].split(',').map(Number);
+          return { r, g, b, a };
+        });
+      
+      // 頻度の高い色を追加（ただし残りの色数まで）
+      for (let i = 0; i < Math.min(sortedColors.length, remainingColors); i++) {
+        // 既に追加されている透明色と重複しないようにする
+        const color = sortedColors[i];
+        if (!(color.r === transparentColor.r && color.g === transparentColor.g && 
+              color.b === transparentColor.b && color.a === transparentColor.a)) {
+          selectedPalette.push(color);
+        }
+      }
+      
+      // パレットの色が足りない場合は、フルパレットから追加
+      if (selectedPalette.length < colorCount) {
+        for (const color of fullPalette) {
+          // 既に選択されている色との重複チェック
+          const isDuplicate = selectedPalette.some(selected => 
+            selected.r === color.r && selected.g === color.g && 
+            selected.b === color.b && selected.a === color.a
+          );
+          
+          if (!isDuplicate) {
+            selectedPalette.push(color);
+            if (selectedPalette.length >= colorCount) break;
+          }
+        }
+      }
+      
+      return selectedPalette;
+    }
+    
+    // 最も近い色を見つける
+    function findClosestColor(r, g, b, a, palette) {
+      let closestDistance = Number.MAX_VALUE;
+      let closestColor = { r: 0, g: 0, b: 0, a: 0 };
+      
+      for (const color of palette) {
+        // 透明度も考慮した色の距離を計算
+        if (a < 128 && color.a < 128) {
+          // 両方透明に近い場合は完全一致とみなす
+          return { r: 0, g: 0, b: 0, a: 0 };
+        }
+        
+        // 色の距離（ユークリッド距離）
+        const dr = r - color.r;
+        const dg = g - color.g;
+        const db = b - color.b;
+        const da = (a - color.a) * 0.5; // アルファの重みを低く
+        
+        const distance = dr*dr + dg*dg + db*db + da*da;
+        
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestColor = color;
+        }
+      }
+      
+      return closestColor;
+    }
+    
+    // ディザリングの誤差追加
+    function addError(data, idx, errR, errG, errB, errA, factor) {
+      data[idx] = clamp(data[idx] + errR * factor);
+      data[idx + 1] = clamp(data[idx + 1] + errG * factor);
+      data[idx + 2] = clamp(data[idx + 2] + errB * factor);
+      data[idx + 3] = clamp(data[idx + 3] + errA * factor);
+    }
+    
+    // ピクセルスタイルの適用
+    function applyPixelStyle(ctx, style, outlineStrength = 30) {
+      const width = ctx.canvas.width;
+      const height = ctx.canvas.height;
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+      
+      if (style === 'outlined') {
+        // アウトライン強調
+        const outlinedData = new Uint8ClampedArray(data.length);
+        
+        // データをコピー
+        for (let i = 0; i < data.length; i++) {
+          outlinedData[i] = data[i];
+        }
+        
+        // アウトライン強度をパーセンテージからしきい値に変換 (1-100 → 30-90)
+        // より緩やかな効果のため、最小値を高くして変換式を調整
+        const threshold = 90 - (outlineStrength * 0.6);
+        
+        // 背景色を特定 (透明ピクセルか画像の四隅の色を参考にする)
+        // 単純化のため、透明ピクセル (alpha < 128) を背景とみなす
+        
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const idx = (y * width + x) * 4;
+            
+            // 現在のピクセルのアルファ値を確認
+            const currentAlpha = data[idx + 3];
+            
+            // 透明でないピクセルのみ処理（対象物の一部）
+            if (currentAlpha >= 128) {
+              // 隣接ピクセルとの境界を検出
+              let isOuterBoundary = false;
+              
+              // 上下左右のピクセルをチェック
+              const directions = [
+                { dx: -1, dy: 0 },
+                { dx: 1, dy: 0 },
+                { dx: 0, dy: -1 },
+                { dx: 0, dy: 1 }
+              ];
+              
+              for (const dir of directions) {
+                const nx = x + dir.dx;
+                const ny = y + dir.dy;
+                
+                // 画像の端かどうかをチェック
+                if (nx < 0 || nx >= width || ny < 0 || ny >= height) {
+                  // 画像の端に接する部分も外周とみなす
+                  isOuterBoundary = true;
+                  break;
+                }
+                
+                const nidx = (ny * width + nx) * 4;
+                const neighborAlpha = data[nidx + 3];
+                
+                // 隣接ピクセルが透明（背景）かチェック
+                if (neighborAlpha < 128) {
+                  isOuterBoundary = true;
+                  break;
+                }
+                
+                // 色の差も考慮（オプション）
+                const dr = Math.abs(data[idx] - data[nidx]);
+                const dg = Math.abs(data[idx + 1] - data[nidx + 1]);
+                const db = Math.abs(data[idx + 2] - data[nidx + 2]);
+                
+                // 強度に基づいた閾値を使用し、色の差が大きく、かつ隣接ピクセルが透明に近い場合
+                if ((dr > threshold || dg > threshold || db > threshold) && neighborAlpha < 200) {
+                  isOuterBoundary = true;
+                  break;
+                }
+              }
+              
+              // 外周のみアウトラインを適用
+              if (isOuterBoundary) {
+                outlinedData[idx] = 0;
+                outlinedData[idx + 1] = 0;
+                outlinedData[idx + 2] = 0;
+              }
+            }
+          }
+        }
+        
+        ctx.putImageData(new ImageData(outlinedData, width, height), 0, 0);
+      }
+      else if (style === 'round') {
+        // 角丸効果の実装
+        
+        // 元の画像データを保存
+        const originalImageData = new ImageData(
+          new Uint8ClampedArray(data), 
+          width, 
+          height
+        );
+        
+        // 新しい空のキャンバスを作成
+        const roundCanvas = document.createElement('canvas');
+        roundCanvas.width = width;
+        roundCanvas.height = height;
+        const roundCtx = roundCanvas.getContext('2d');
+        
+        // 背景を透明に設定
+        roundCtx.clearRect(0, 0, width, height);
+        
+        // 各ピクセルを円として描画
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const idx = (y * width + x) * 4;
+            
+            // ピクセルの色を取得
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
+            const a = data[idx + 3];
+            
+            if (a > 0) { // 透明でないピクセルのみ描画
+              roundCtx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a/255})`;
+              roundCtx.beginPath();
+              // 円を描画 (少し小さめのサイズで)
+              roundCtx.arc(x + 0.5, y + 0.5, 0.4, 0, Math.PI * 2);
+              roundCtx.fill();
+            }
+          }
+        }
+        
+        // 元のコンテキストにコピー
+        ctx.clearRect(0, 0, width, height);
+        ctx.drawImage(roundCanvas, 0, 0);
+      }
+    }
+    
+    // 値を0-255の範囲に制限
+    function clamp(value) {
+      return Math.max(0, Math.min(255, Math.round(value)));
+    }
+    
+    // ダウンロードボタン
+    downloadBtn.addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.download = 'pixel-art.png';
+      link.href = pixelCanvas.toDataURL('image/png');
+      link.click();
+    });
+    
+    // 初期表示時
+    updateColorCountDisplay();
+    updateContrastDisplay();
+    
+    // スタイル選択の初期状態を設定
+    pixelStyleSelect.dispatchEvent(new Event('change'));
+  </script>
+</body>
+</html>
