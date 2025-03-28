@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>美咲フォントで画像ダウンロード (透過背景・1行目白)</title>
+    <style>
+        @font-face {
+            font-family: 'Misaki';
+            /* フォントファイルへのパスを適切に設定してください */
+            src: url('fonts/k8x12.ttf') format('truetype');
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background-color: #f0f0f0; /* 背景色がわかるようにbodyの背景を少し暗く */
+        }
+
+        canvas {
+            border: 1px dashed #ccc; /* 透過背景が見えるように破線に */
+            /* background-color: #fff; */ /* 背景色指定を削除 */
+            margin-top: 20px;
+            image-rendering: pixelated;
+            /* わかりやすいように背景パターンを追加（オプション） */
+            background-image: linear-gradient(45deg, #eee 25%, transparent 25%),
+                              linear-gradient(-45deg, #eee 25%, transparent 25%),
+                              linear-gradient(45deg, transparent 75%, #eee 75%),
+                              linear-gradient(-45deg, transparent 75%, #eee 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        textarea {
+            width: 80%;
+            max-width: 600px;
+            margin: 10px 0;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.1);
+            font-family: monospace;
+            white-space: pre;
+            overflow: auto;
+            min-height: 100px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .input-field {
+            display: inline-block;
+            margin: 5px 10px;
+        }
+
+        .input-field label {
+            margin-right: 5px;
+            font-size: 14px;
+        }
+
+        .input-field input {
+            width: 60px;
+            padding: 5px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        button, a {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px;
+        }
+
+        button:hover, a:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>美咲フォントで画像ダウンロード (透過背景・1行目白)</h1>
+
+    <div class="control-group">
+        <div class="input-field">
+            <label for="gridWidth">横ユニット数:</label>
+            <input type="number" id="gridWidth" value="1" min="1" oninput="updatePlaceholder()">
+        </div>
+        <div class="input-field">
+            <label for="gridHeight">縦ユニット数:</label>
+            <input type="number" id="gridHeight" value="1" min="1" oninput="updatePlaceholder()">
+        </div>
+        <div class="input-field">
+            <label for="firstLineGap">1-2行目の追加行間(px):</label>
+            <input type="number" id="firstLineGap" value="0" min="0">
+        </div>
+    </div>
+
+    <textarea id="inputText" placeholder="テキストを入力してください..."></textarea>
+    <br>
+    <button onclick="drawGridText()">画像生成</button>
+    <a id="downloadLink" style="display: none;">PNG画像をダウンロード</a>
+    <br>
+    <canvas id="textCanvas"></canvas>
+
+    <script>
+        // --- 定数定義 ---
+        const BASE_UNIT_SIZE = 64;
+        const SCALE = 8;
+        const MAX_LINES_PER_UNIT = 8;
+        const LINE_HEIGHT = 12;
+        const FONT_STYLE = '12px "Misaki"';
+        const DEFAULT_COLOR = 'black'; // 通常の文字色
+        const FIRST_LINE_COLOR = 'white'; // 1行目の文字色
+
+        const FONT_LOADED = document.fonts.load(FONT_STYLE);
+        FONT_LOADED.then(() => {
+            console.log('美咲フォントがロードされました');
+            updatePlaceholder();
+        }).catch(err => {
+            console.error('フォントのロードに失敗しました:', err);
+            alert('フォントのロードに失敗しました。ページを再読み込みしてください。');
+            document.getElementById('inputText').placeholder = "テキストを入力してください (フォント読込エラー)";
+        });
+
+        function drawGridText() {
+            FONT_LOADED.then(() => {
+                const canvas = document.getElementById('textCanvas');
+                const ctx = canvas.getContext('2d'); // 常に2Dコンテキストを取得
+
+                // --- 入力値取得 ---
+                const gridWidth = parseInt(document.getElementById('gridWidth').value) || 1;
+                const gridHeight = parseInt(document.getElementById('gridHeight').value) || 1;
+                const firstLineGap = Math.max(0, parseInt(document.getElementById('firstLineGap').value) || 0);
+                const inputText = document.getElementById('inputText').value;
+                const inputLines = inputText.split('\n');
+
+                // --- キャンバス設定 ---
+                const totalCanvasWidth = BASE_UNIT_SIZE * gridWidth;
+                const totalCanvasHeight = BASE_UNIT_SIZE * gridHeight;
+                const scaledWidth = totalCanvasWidth * SCALE;
+                const scaledHeight = totalCanvasHeight * SCALE;
+
+                canvas.width = scaledWidth;
+                canvas.height = scaledHeight;
+                canvas.style.width = `${scaledWidth}px`;
+                canvas.style.height = `${scaledHeight}px`;
+
+                // --- コンテキスト設定 ---
+                ctx.resetTransform();
+                ctx.scale(SCALE, SCALE);
+                ctx.font = FONT_STYLE;
+                // fillStyle は描画直前に設定するのでここでは不要
+                ctx.imageSmoothingEnabled = false;
+
+                // --- 描画 ---
+                // clearRectは指定範囲を透明なピクセルでクリアする
+                ctx.clearRect(0, 0, totalCanvasWidth, totalCanvasHeight);
+
+                let currentLineIndex = 0; // 全体の行インデックス
+
+                for (let gy = 0; gy < gridHeight; gy++) {
+                    for (let gx = 0; gx < gridWidth; gx++) {
+                        const offsetX = gx * BASE_UNIT_SIZE;
+                        const offsetY = gy * BASE_UNIT_SIZE;
+                        let currentY = offsetY + LINE_HEIGHT; // 1行目のベースラインY
+
+                        for (let lineInUnit = 0; lineInUnit < MAX_LINES_PER_UNIT; lineInUnit++) {
+                            if (currentLineIndex >= inputLines.length) break;
+
+                            const line = inputLines[currentLineIndex];
+                            let yPosition;
+
+                            if (lineInUnit === 0) {
+                                yPosition = currentY; // 1行目
+                            } else {
+                                // 2行目以降
+                                currentY += LINE_HEIGHT; // 基本行間加算
+                                if (lineInUnit === 1) {
+                                    currentY += firstLineGap; // 追加行間加算 (2行目のみ)
+                                }
+                                yPosition = currentY;
+                            }
+
+                            // ★★★ 変更点: 描画色を設定 ★★★
+                            if (currentLineIndex === 0) {
+                                ctx.fillStyle = FIRST_LINE_COLOR; // 全体の1行目なら白
+                            } else {
+                                ctx.fillStyle = DEFAULT_COLOR; // それ以外は黒
+                            }
+                            // ★★★ ここまで ★★★
+
+                            // Y座標がユニットの高さを超える場合は描画しない (オプション)
+                            // if (yPosition > offsetY + BASE_UNIT_SIZE + LINE_HEIGHT/2) break; // ベースライン基準なので少し余裕をもたせる
+
+                            ctx.fillText(line, offsetX, yPosition);
+                            currentLineIndex++; // 全体の行インデックスをインクリメント
+                        } // end lineInUnit loop
+
+                        if (currentLineIndex >= inputLines.length) {
+                             gy = gridHeight; // gyループを終了
+                             break; // gxループを抜ける
+                        }
+                    } // end gx loop
+                } // end gy loop
+
+                // --- ダウンロードリンク ---
+                const downloadLink = document.getElementById('downloadLink');
+                try {
+                    const imageData = canvas.toDataURL('image/png'); // PNGは透過をサポート
+                    downloadLink.href = imageData;
+                    downloadLink.download = `converted_text_${gridWidth}x${gridHeight}_gap${firstLineGap}_tr.png`; // ファイル名に透過(tr)情報追加
+                    downloadLink.style.display = 'inline-block';
+                } catch (e) {
+                    console.error("キャンバスからデータURLの作成に失敗:", e);
+                    alert("画像の生成に失敗しました。キャンバスサイズが大きすぎる可能性があります。");
+                    downloadLink.style.display = 'none';
+                }
+
+            }).catch(err => {
+                 console.error('フォントがロードされていないため描画できません:', err);
+                 alert('フォントがロードされていません。ページを再読み込みしてください。');
+            });
+        }
+
+        function updatePlaceholder() {
+             FONT_LOADED.then(() => {
+                const gridWidth = parseInt(document.getElementById('gridWidth').value) || 1;
+                const gridHeight = parseInt(document.getElementById('gridHeight').value) || 1;
+                const maxTotalLines = gridHeight * MAX_LINES_PER_UNIT;
+                const placeholderText = `テキストを入力 (改行反映, 1行目白, 1ユニット最大${MAX_LINES_PER_UNIT}行, 合計${maxTotalLines}行まで)`;
+                document.getElementById('inputText').placeholder = placeholderText;
+             }).catch(() => {
+                  document.getElementById('inputText').placeholder = "テキストを入力してください (フォント読込エラー)";
+             });
+        }
+
+    </script>
+</body>
+</html>
