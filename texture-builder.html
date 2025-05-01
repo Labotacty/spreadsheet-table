@@ -506,13 +506,17 @@
 									var colG = image.data[(px + py * canvas.width) * 4 + 1];
 									var colB = image.data[(px + py * canvas.width) * 4 + 2];
 									var colA = image.data[(px + py * canvas.width) * 4 + 3];
-									var colorIndex = -1;
-									for (i = 0; i < colorCompare.length; i++) {
+									let colorIndex = -1;
+									for (let i = 0; i < colorCompare.length; i++) {
 										if (colR == colorCompare[i].r && colG == colorCompare[i].g && colB == colorCompare[i].b && colA == colorCompare[i].a) {
 											colorIndex = colorNumbers[i];
 											colorCount[i]++;
 											break;
 										}
+									}
+									// 完全一致しなければ最近傍色を再検索
+									if (colorIndex === -1) {
+										colorIndex = findClosestPaletteColor(colR, colG, colB, colA);
 									}
 									grid[x + y * 64 + 1] = colorIndex;
 								}
