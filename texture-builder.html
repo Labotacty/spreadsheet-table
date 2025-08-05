@@ -107,7 +107,7 @@
 					<button id="generate">Generate!</button>
 					<div id="done">
 						<p><canvas id="canvas" style="border:2px solid black;"></canvas></p>
-						<p><button id="csv"></button>&nbsp;&nbsp;<button id="GTD"></button></p>
+						<p><button id="csv"></button>&nbsp;&nbsp;<button id="GTD"></button><button id="BIN"></button></p>
 					</div>
 				</div>
 			</div>
@@ -469,6 +469,10 @@
 					download(2);
 				});
 				
+				document.getElementById("BIN").addEventListener("click", function() {
+					download(3);
+				});
+				
 				function download(type) {
 					var canvas = document.getElementById("canvas");
 					var context = canvas.getContext("2d");
@@ -557,7 +561,9 @@
 								var blob;
 								if (type == 1) {
 									blob = new Blob([fileContent], {type: "text/csv;charset=utf-8"});
-								} else {
+								} else if (type == 2) {
+									blob = new Blob([fileContent.buffer], {type: "application/octet-stream"});
+								} else if (type == 3) {
 									blob = new Blob([fileContent.buffer], {type: "application/octet-stream"});
 								}
 								
@@ -1000,9 +1006,11 @@
 						if (canvas.width + canvas.height == 128) {
 							document.getElementById("csv").innerText = "Download as .csv File";
 							document.getElementById("GTD").innerText = "Download as .GTD File";
+							document.getElementById("BIN").innerText = "Download as .bin File";
 						} else {
 							document.getElementById("csv").innerText = "Download as .csv Files";
 							document.getElementById("GTD").innerText = "Download as .GTD Files";
+							document.getElementById("BIN").innerText = "Download as .bin Files";
 						}
 						
 					} else {
