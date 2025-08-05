@@ -537,9 +537,9 @@
 							// Determine file name
 							var fileNameWithExt;
 							if (sizeX + sizeY == 2) {    
-								fileNameWithExt = filename + (type == 1 ? ".csv" : ".GTD");
+								fileNameWithExt = filename + (type==1?".csv": type==2?".GTD":".bin");
 							} else {
-								fileNameWithExt = filename + " " + (u + 1) + "-" + (v + 1) + (type == 1 ? ".csv" : ".GTD");
+								fileNameWithExt = filename + " " + (u+1) + "-" + (v+1) + (type==1?".csv": type==2?".GTD":".bin");
 							}
 							
 							// Create file content
