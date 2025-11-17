@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GBG Game ID Explorer</title>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <style>
+        /* ベーススタイル */
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            text-align: center; 
+            padding: 10px; /* パディングを小さく */
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+        }
+        
+        /* コンテナ */
+        .container {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            padding: 20px 15px; /* パディングを調整 */
+            border-radius: 12px;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+            box-sizing: border-box; /* パディングを幅に含める */
+        }
+
+        h1 {
+            color: #007bff;
+            font-weight: 400;
+            font-size: 1.5em; /* スマホ向けに小さく */
+            margin-bottom: 5px;
+        }
+        
+        /* 入力コントロールエリア */
+        #inputControls { 
+            margin: 15px 0; 
+            padding: 10px; 
+            border: 1px solid #e0e0e0; 
+            border-radius: 8px; 
+            background-color: #f9f9f9;
+        }
+        #inputControls p {
+            margin: 8px 0;
+        }
+
+        /* 入力フィールド */
+        input[type="number"] { 
+            padding: 8px 12px; 
+            border: 1px solid #ccc; 
+            border-radius: 4px; 
+            width: 100%; /* スマホで横幅いっぱい */
+            max-width: 150px; /* PCでの最大幅 */
+            text-align: center;
+            transition: border-color 0.3s;
+            box-sizing: border-box;
+            display: inline-block;
+        }
+        
+        /* ボタン */
+        button { 
+            padding: 12px 25px; 
+            font-size: 1.1em; 
+            cursor: pointer; 
+            margin-top: 15px; 
+            border: none;
+            border-radius: 6px;
+            background-color: #007bff;
+            color: white;
+            transition: background-color 0.3s, transform 0.1s;
+            box-shadow: 0 4px 6px rgba(0, 123, 255, 0.3);
+            width: 100%; /* スマホで横幅いっぱい */
+            max-width: 300px;
+        }
+        button:hover {
+            background-color: #0056b3;
+            transform: translateY(-1px);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        
+        /* 出力ID */
+        #outputId { 
+            font-size: 1.8em; /* スマホ向けに調整 */
+            color: #28a745;
+            margin-top: 20px; 
+            padding: 15px;
+            border: 2px dashed #28a74550;
+            border-radius: 8px;
+            font-weight: bold;
+            word-break: break-all;
+            background-color: #e6ffe6;
+        }
+        
+        /* 情報テキスト */
+        #rangeInfo { 
+            margin-top: 15px; 
+            color: #6c757d; 
+            font-size: 0.85em; 
+        }
+
+        /* メディアクエリ: PCなど幅が広い画面での調整 */
+        @media (min-width: 600px) {
+            h1 {
+                font-size: 2em;
+            }
+            #outputId {
+                font-size: 2.2em;
+            }
+            button {
+                width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GBG Game ID Explorer</h1>
+        <p>探索範囲を設定してください</p>
+        
+        <div id="inputControls">
+            <p>
+                最小値: 
+                <input type="number" id="minDecimalInput" value="1000001" min="1000001" max="16777215">
+            </p>
+            <p>
+                最大値: 
+                <input type="number" id="maxDecimalInput" value="3000000" min="1000001" max="16777215">
+            </p>
+        </div>
+
+        <button onclick="generateValidGameID()">
+            IDをランダム生成
+        </button>
+
+        <div id="outputId">---</div>
+        
+        <div id="rangeInfo">
+            探索範囲の値が小さい(1000000)ほど古い作品、3000000くらいだと最近の作品になります。<br>
+            有効なIDでも実際にゲームが存在するかは不明です。大体10回くらい試すとヒットするくらいの感覚です。
+        </div>
+    </div>
+
+    <script>
+        // --- ID変換に必要な定数と関数 (機能部分は変更なし) ---
+        var key = 0xAD9ED5;
+        var validChars = "0123456789BCDFGHJKLMNPRTVWXY";
+
+        function decimalToID(prefix, decimal) {
+            if (decimal < 0 || decimal > 0xffffff) return "";
+            var fullDecimal = decimal ^ key;
+            fullDecimal = (fullDecimal | ((fullDecimal & 255) ^ (fullDecimal >> 8 & 255) ^ (fullDecimal >> 16 & 255) ^ 26) << 24) >>> 0;
+            
+            var ID = "";
+            for (var i = 0; i < 9; i++) {
+                ID = validChars[fullDecimal % 28] + ID;
+                if (i % 3 == 2) ID = " " + ID;
+                fullDecimal = Math.floor(fullDecimal / 28);
+            }
+            return prefix + ID;
+        }
+
+        function isValid(fullDecimal) {
+            return fullDecimal >= 0 && fullDecimal <= 0xffffffff && ((fullDecimal & 255) ^ (fullDecimal >> 8 & 255) ^ (fullDecimal >> 16 & 255) ^ (fullDecimal >> 24 & 255)) == 26;
+        }
+        // --------------------------------------------------
+
+        function generateValidGameID() {
+            const MIN_DECIMAL = parseInt(document.getElementById("minDecimalInput").value);
+            const MAX_DECIMAL = parseInt(document.getElementById("maxDecimalInput").value);
+            const outputElement = document.getElementById("outputId");
+            
+            if (isNaN(MIN_DECIMAL) || isNaN(MAX_DECIMAL) || MIN_DECIMAL < 0 || MAX_DECIMAL > 16777215 || MIN_DECIMAL > MAX_DECIMAL) {
+                outputElement.innerText = "エラー: 範囲が不正です。最小値が最大値を超えていないか確認してください。";
+                outputElement.style.color = "#dc3545";
+                return;
+            }
+
+            outputElement.style.color = "#007bff";
+            outputElement.innerText = "生成中...";
+
+            let attempts = 0;
+            let decimal;
+            let gameID = "";
+            
+            while (gameID === "" && attempts < 100000) {
+                decimal = Math.floor(Math.random() * (MAX_DECIMAL - MIN_DECIMAL + 1)) + MIN_DECIMAL;
+                
+                //if (decimal % 2 !== 0) {
+                //    decimal += 1;
+                //}
+
+                if (decimal > MAX_DECIMAL) {
+                    attempts++;
+                    continue; 
+                }
+
+                let fullDecimal = decimal ^ key;
+                let checksummedFullDecimal = (fullDecimal | ((fullDecimal & 255) ^ (fullDecimal >> 8 & 255) ^ (fullDecimal >> 16 & 255) ^ 26) << 24) >>> 0;
+
+                if (isValid(checksummedFullDecimal)) {
+                    gameID = decimalToID("G", decimal);
+                }
+                attempts++;
+            }
+
+            if (gameID !== "") {
+                outputElement.innerText = gameID;
+                outputElement.style.color = "#28a745";
+            } else {
+                outputElement.innerText = `生成失敗 (${attempts}回試行): 有効なIDが見つかりませんでした。`;
+                outputElement.style.color = "#dc3545";
+            }
+        }
+    </script>
+
+</body>
+</html>
