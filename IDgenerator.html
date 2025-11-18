@@ -81,33 +81,20 @@
             transform: translateY(0);
         }
         
-        /* 出力ID */
+        /* 出力IDコンテナ */
         #outputId { 
-            font-size: 1.8em; /* スマホ向けに調整 */
-            color: #28a745;
             margin-top: 20px; 
             padding: 15px;
-            border: 2px dashed #28a74550;
+            border: 2px dashed #e0e0e0;
             border-radius: 8px;
-            font-weight: bold;
-            word-break: break-all;
-            background-color: #e6ffe6;
-        }
-        
-        /* 情報テキスト */
-        #rangeInfo { 
-            margin-top: 15px; 
-            color: #6c757d; 
-            font-size: 0.85em; 
+            background-color: #f9f9f9;
+            min-height: 100px;
         }
 
         /* メディアクエリ: PCなど幅が広い画面での調整 */
         @media (min-width: 600px) {
             h1 {
                 font-size: 2em;
-            }
-            #outputId {
-                font-size: 2.2em;
             }
             button {
                 width: auto;
@@ -139,12 +126,14 @@
         
         <div id="rangeInfo">
             探索範囲の値が小さい(1000000)ほど古い作品、3000000くらいだと最近の作品になります。<br>
-            有効なIDでも実際にゲームが存在するかは不明です。大体10回くらい試すとヒットするくらいの感覚です。
+            有効なIDでも実際にゲームが存在するかは不明です。<br>
+            ゲームIDは3つ生成します。（元となる10進数とその前後のIDを生成）<br>
+            はじプロのIDの仕様上、連続した10進数でゲームIDを生成することはないため3つとも試すことをお勧めします。<br>
         </div>
     </div>
 
     <script>
-        // --- ID変換に必要な定数と関数 (機能部分は変更なし) ---
+        // --- ID変換に必要な定数と関数 ---
         var key = 0xAD9ED5;
         var validChars = "0123456789BCDFGHJKLMNPRTVWXY";
 
@@ -188,10 +177,6 @@
             while (gameID === "" && attempts < 100000) {
                 decimal = Math.floor(Math.random() * (MAX_DECIMAL - MIN_DECIMAL + 1)) + MIN_DECIMAL;
                 
-                //if (decimal % 2 !== 0) {
-                //    decimal += 1;
-                //}
-
                 if (decimal > MAX_DECIMAL) {
                     attempts++;
                     continue; 
@@ -202,13 +187,67 @@
 
                 if (isValid(checksummedFullDecimal)) {
                     gameID = decimalToID("G", decimal);
+                    break; 
                 }
                 attempts++;
             }
 
             if (gameID !== "") {
-                outputElement.innerText = gameID;
-                outputElement.style.color = "#28a745";
+                const baseDecimal = decimal;
+
+                const processAdjacentDecimal = (offset) => {
+                    const checkDecimal = baseDecimal + offset;
+                    
+                    if (checkDecimal < 0 || checkDecimal > 16777215) {
+                        return { id: "範囲外", valid: false, decimal: checkDecimal, label: (offset < 0 ? '-1' : '+1') };
+                    }
+
+                    const fullDecimal = checkDecimal ^ key;
+                    const checksummedFullDecimal = (fullDecimal | ((fullDecimal & 255) ^ (fullDecimal >> 8 & 255) ^ (fullDecimal >> 16 & 255) ^ 26) << 24) >>> 0;
+                    
+                    const idString = decimalToID("G", checkDecimal);
+                    const validChecksum = isValid(checksummedFullDecimal);
+                    
+                    return { 
+                        id: idString, 
+                        valid: validChecksum, 
+                        decimal: checkDecimal, 
+                        label: (offset < 0 ? '-1' : '+1') 
+                    };
+                };
+
+                const results = [
+                    processAdjacentDecimal(-1),
+                    { id: gameID, valid: true, decimal: baseDecimal, label: '0 (ベース)' },
+                    processAdjacentDecimal(+1)
+                ];
+
+                // --- 出力フォーマット (ゲームIDを緑の太字に変更) ---
+                let htmlOutput = `
+                    <span style="font-size: 0.9em; color: #6c757d;">基となるランダムな10進数: </span>
+                    <span style="font-size: 1.5em; font-weight: bold; color: #007bff; margin-bottom: 15px; display: block;">${baseDecimal}</span>
+                    <div style="text-align: left; max-width: 400px; margin: 0 auto;">
+                        ${results.map(r => {
+                            const color = r.valid ? '#28a745' : '#dc3545';
+                            const status = r.valid ? ' (有効)' : ' (無効)';
+                            const decimalLabel = r.label;
+                            const statusText = r.id === "範囲外" ? ' (範囲外)' : status;
+                            
+                            // ゲームIDのスタイル: 緑色 (#28a745) の太字、大きなサイズ
+                            const idStyle = `font-size: 1.8em; font-weight: bold; color: ${color}; word-break: break-all;`;
+
+                            return `
+                                <div style="margin-bottom: 15px; padding: 10px; border: 1px solid #eee; border-radius: 6px; background-color: ${r.decimal === baseDecimal ? '#e6f7ff' : '#ffffff'};">
+                                    <p style="margin: 0; ${idStyle}">
+                                        ${r.id}
+                                    </p>
+                                </div>`;
+                        }).join('')}
+                    </div>
+                `;
+
+                outputElement.innerHTML = htmlOutput;
+                outputElement.style.color = "initial"; 
             } else {
                 outputElement.innerText = `生成失敗 (${attempts}回試行): 有効なIDが見つかりませんでした。`;
                 outputElement.style.color = "#dc3545";
