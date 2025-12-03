@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>GBG Camera Sim v0.4</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #1a1a1a; color: #eee; font-family: 'Segoe UI', sans-serif; }
+        
+        #ui-panel { position: absolute; top: 0; left: 0; width: 360px; height: 100vh; background: #252525; border-right: 1px solid #333; display: flex; flex-direction: column; z-index: 10; }
+        #ui-header { padding: 10px 15px; background: #2a2a2a; border-bottom: 1px solid #333; }
+        h2 { margin: 0 0 10px 0; font-size: 16px; color: #fff; text-align: center; }
+
+        .tab-group { display: flex; gap: 5px; margin-bottom: 10px; }
+        .tab-btn { flex: 1; padding: 8px; border: none; cursor: pointer; background: #333; color: #aaa; font-weight: bold; border-radius: 4px 4px 0 0; }
+        .tab-btn.active { background: #444; color: #fff; border-bottom: 2px solid #007acc; }
+
+        #scroll-area { flex: 1; overflow-y: auto; padding: 10px; scrollbar-width: thin; }
+
+        .xyz-label { font-size: 11px; color: #aaa; display: block; margin-bottom: 2px; }
+        .xyz-row { display: flex; gap: 4px; margin-bottom: 6px; }
+        .xyz-item { flex: 1; position: relative; }
+        .xyz-item input { width: 100%; box-sizing: border-box; background: #222; border: 1px solid #444; color: #eee; padding: 4px; border-radius: 3px; font-size: 12px; }
+        
+        .is-x::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:#ff4d4d; }
+        .is-y::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:#4dff4d; }
+        .is-z::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:#4d4dff; }
+        .is-w::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:#ddd; }
+        .is-h::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:#aaa; }
+        .is-d::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:#888; }
+
+        .card { background: #333; border: 1px solid #444; border-radius: 6px; padding: 10px; margin-bottom: 10px; }
+        .card.selected { border: 1px solid #007acc; background: #2a3a4a; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: 13px; font-weight: bold; }
+        .btn-delete { background: none; border: none; color: #666; cursor: pointer; font-size: 14px;}
+        .btn-delete:hover { color: #ff4444; }
+        
+        input[type="color"] { border: none; width: 30px; height: 20px; padding: 0; background: none; cursor: pointer; }
+        select.type-select { background: #222; color: #eee; border: 1px solid #555; font-size: 11px; border-radius: 3px; padding: 2px; width: 70px;}
+
+        .btn-add { width: 100%; padding: 8px; background: #333; border: 1px dashed #666; color: #aaa; cursor: pointer; }
+        .btn-add:hover { background: #444; color: #fff; }
+        
+        .btn-toggle-view { width: 100%; padding: 10px; background: #007acc; color: #fff; border: none; font-weight: bold; border-radius: 4px; margin-bottom:10px;}
+        .btn-toggle-view.active { background: #d32f2f; }
+
+        #main-container { position: absolute; top: 0; left: 360px; right: 0; bottom: 0; background: #111; display: flex; justify-content: center; align-items: center; }
+        #aspect-frame { width: 100%; max-width: 177.78vh; aspect-ratio: 16/9; background: #000; position: relative; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
+        #canvas-main { width: 100%; height: 100%; display: block; }
+        
+        #preview-box { position: absolute; bottom: 20px; right: 20px; width: 320px; height: 180px; border: 2px solid #ffcc00; background: #000; z-index: 20; display:block;}
+        #preview-label { position: absolute; bottom: 205px; right: 20px; font-size: 12px; color: #ffcc00; font-weight: bold; text-shadow: 1px 1px 2px #000; display:block;}
+        #canvas-preview { width: 100%; height: 100%; display: block; }
+        
+        #hint-text { position: absolute; top: 10px; left: 370px; color: #aaa; font-size: 12px; pointer-events: none; z-index: 100; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 4px; }
+        .toggle-label { font-size: 13px; display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 6px;}
+        
+        .fov-mode { display:flex; gap:5px; font-size:11px; color:#aaa; margin-top:5px; justify-content: flex-end;}
+        .fov-mode label { cursor:pointer; }
+
+        /* --- Mobile / Responsive Styles (v3) --- */
+        @media (max-width: 768px) {
+            /* 1. 操作パネル：高さを50%に確保 */
+            #ui-panel {
+                width: 100%;
+                height: 50vh; /* 半分確保 */
+                top: auto;
+                bottom: 0;
+                left: 0;
+                border-right: none;
+                border-top: 2px solid #444;
+                box-shadow: 0 -2px 10px rgba(0,0,0,0.5);
+            }
+
+            /* 2. ヘッダーのダイエット（ここが重要） */
+            #ui-header {
+                padding: 5px 10px; /* 余白を減らす */
+                flex-shrink: 0;    /* 縮まないようにする */
+            }
+            #ui-header h2 { font-size: 12px; margin-bottom: 5px; display: inline-block; }
+            .xyz-row { margin-bottom: 2px; } /* 入力欄の隙間を詰める */
+            
+            /* 3. スクロールエリアを強制的に広げる */
+            #scroll-area {
+                flex: 1; /* 残りの高さを全て使う */
+                overflow-y: scroll; /* 必ずスクロールバーを出す */
+                -webkit-overflow-scrolling: touch;
+                padding-bottom: 60px; /* 下部が隠れないように */
+                min-height: 0; /* Flexboxのはみ出し防止 */
+            }
+
+            /* 4. メイン画面 */
+            #main-container {
+                left: 0;
+                width: 100%;
+                height: 50vh; /* パネルの上半分 */
+                bottom: 50vh;
+                top: 0;
+            }
+
+            /* 5. プレビュー画面：サイズ強制適用 */
+            #preview-box {
+                width: 120px !important;
+                height: 67.5px !important;
+                right: 10px;
+                bottom: calc(50vh + 10px); /* パネルの少し上 */
+                z-index: 20;
+            }
+            /* ★ここが修正点：Canvasの中身も強制的に枠に合わせる */
+            #canvas-preview {
+                width: 100% !important;
+                height: 100% !important;
+            }
+            
+            /* 6. ラベル位置調整 */
+            #preview-label {
+                right: 10px;
+                bottom: calc(50vh + 80px);
+                font-size: 10px;
+            }
+            
+            /* ヒント位置 */
+            #hint-text {
+                left: 5px; top: 5px; max-width: 200px; font-size: 10px;
+            }
+
+            /* 指操作用に少し大きく */
+            .btn-delete { padding: 5px 10px; font-size: 16px; }
+        }
+
+        /* 設定モーダル表示時の背景（クリックガード） */
+        #settings-modal-backdrop {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 9998;
+        }
+
+        #hint-text { display: none !important; }
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
+</head>
+<body>
+
+<div id="ui-panel">
+    <div id="ui-header">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+            <h2 style="margin:0;">GBG Cam Sim v0.4</h2>
+            <div style="display:flex; gap:5px;">
+                <button id="btn-settings" style="background:#444; color:#fff; border:1px solid #666; padding:5px 10px; border-radius:4px; cursor:pointer;">⚙️ 設定</button>
+                <button id="view-btn" class="btn-toggle-view" style="margin:0; padding:5px 10px; font-size:12px;">🎥 カメラ視点を見る</button>
+            </div>
+        </div>
+
+        <div>
+            <div style="font-size:11px; color:#aaa; display:flex; justify-content:space-between;">
+                <span>Time (再生)</span><span id="progress-val">0.00</span>
+            </div>
+            <input type="range" id="slider" min="0" max="1" step="0.001" value="0" style="width:100%;">
+        </div>
+    </div>
+
+    <div class="tab-group">
+        <button class="tab-btn active" onclick="switchTab('scenes')">🎬 シーン</button>
+        <button class="tab-btn" onclick="switchTab('objects')">📦 モノノードン</button>
+    </div>
+
+    <div id="scroll-area">
+        <div id="tab-scenes">
+            <div id="scene-list"></div>
+            <button id="add-scene-btn" class="btn-add">＋ シーン追加</button>
+        </div>
+        <div id="tab-objects" style="display:none;">
+            <div id="object-list"></div>
+            <button id="add-object-btn" class="btn-add">＋ モノを追加</button>
+        </div>
+    </div>
+</div>
+
+<div id="settings-modal" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:280px; background:#252525; border:1px solid #555; box-shadow:0 0 20px rgba(0,0,0,0.8); z-index:9999; border-radius:8px; padding:15px;">
+    <h3 style="margin-top:0; border-bottom:1px solid #444; padding-bottom:10px; margin-bottom:10px;">環境設定</h3>
+    
+    <div style="background:#333; padding:8px; border-radius:4px; margin-bottom:10px; border:1px solid #444;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:12px; font-weight:bold;">FOV (画角)</span>
+            <input type="number" id="fov-val" value="90" style="width:60px; padding:5px;">
+        </div>
+        <div class="fov-mode" style="margin-top:8px;">
+            <label style="margin-right:10px;"><input type="radio" name="fovType" value="v"> 縦(V)</label>
+            <label><input type="radio" name="fovType" value="h" checked> 横(H)</label>
+        </div>
+    </div>
+    
+    <label class="toggle-label" style="margin-top:10px;">
+        <input type="checkbox" id="haji-mode-chk">
+        <span>はじプロ風ワールド (Sky Mode)</span>
+    </label>
+    
+    <label class="toggle-label">
+        <input type="checkbox" id="frustum-chk" checked>
+        <span style="color:#ffaa00;">視錐台を表示 (Frustum)</span>
+    </label>
+    
+    <div style="border-top:1px solid #444; padding-top:10px; margin-top:10px;">
+        <div style="font-size:12px; color:#888; margin-bottom:5px;">☀ 光源位置 (Light)</div>
+        <div class="xyz-row">
+            <div class="xyz-item is-x"><input type="number" id="light-x" value="15"></div>
+            <div class="xyz-item is-y"><input type="number" id="light-y" value="20"></div>
+            <div class="xyz-item is-z"><input type="number" id="light-z" value="10"></div>
+        </div>
+    </div>
+
+    <button onclick="document.getElementById('settings-modal').style.display='none'" style="width:100%; margin-top:15px; padding:10px; background:#007acc; color:#fff; border:none; border-radius:4px;">閉じる</button>
+</div>
+
+<div id="main-container">
+    <div id="aspect-frame">
+        <canvas id="canvas-main"></canvas>
+        <div id="hint-text">💡 オブジェクト/カメラ/注視点をクリックして移動 (0.1スナップ)</div>
+    </div>
+</div>
+
+<div id="preview-label">▼ ゲーム画面</div>
+<div id="preview-box">
+    <canvas id="canvas-preview"></canvas>
+</div>
+
+<script>
+    let scenes = [{ cx: 0, cy: 5, cz: -10, tx: 0, ty: 1, tz: 0 }, { cx: 8, cy: 8, cz: -2, tx: 0, ty: 1, tz: 0 }];
+    // ★ type: 'box' | 'sphere' | 'cylinder' を追加
+    let objects = [{ type: 'box', x: 0, y: 1, z: 0, w: 2, h: 2, d: 2, color: "#ffffff" }];
+    let selection = { type: null, index: -1 };
+
+    const scene = new THREE.Scene();
+    const canvasMain = document.getElementById('canvas-main');
+    const rendererMain = new THREE.WebGLRenderer({ canvas: canvasMain, antialias: true, alpha: true });
+    rendererMain.shadowMap.enabled = true;
+    
+    const canvasPreview = document.getElementById('canvas-preview');
+    const rendererPreview = new THREE.WebGLRenderer({ canvas: canvasPreview, antialias: true, alpha: true });
+    rendererPreview.shadowMap.enabled = true;
+
+    const godCamera = new THREE.PerspectiveCamera(45, 16/9, 0.1, 1000);
+    godCamera.position.set(20, 20, 20);
+    
+    const gameCamera = new THREE.PerspectiveCamera(60, 16/9, 0.1, 1000);
+    const visualCamera = new THREE.PerspectiveCamera(60, 16/9, 0.1, 40); 
+    
+    const controls = new THREE.OrbitControls(godCamera, canvasMain);
+    controls.enableDamping = true;
+
+    const transformControl = new THREE.TransformControls(godCamera, canvasMain);
+    transformControl.setTranslationSnap(0.1); 
+
+    if (window.innerWidth < 768) {
+        transformControl.setSize(2.0); // PCの2倍のサイズにする
+    }
+    
+    transformControl.addEventListener('dragging-changed', function (event) {
+        controls.enabled = !event.value;
+    });
+    
+    transformControl.addEventListener('change', function () {
+        if (!transformControl.object) return;
+        if (selection.type === 'object' && selection.index !== -1) {
+            const obj = objects[selection.index];
+            obj.x = transformControl.object.position.x;
+            obj.y = transformControl.object.position.y;
+            obj.z = -transformControl.object.position.z; // Z反転
+            updateObjectUIInputsOnly(selection.index);
+        } else if (selection.type === 'camera' && selection.index !== -1) {
+            const scn = scenes[selection.index];
+            scn.cx = transformControl.object.position.x;
+            scn.cy = transformControl.object.position.y;
+            scn.cz = -transformControl.object.position.z;
+            updateSceneUIInputsOnly(selection.index);
+            updateCameraPos(true);
+        } else if (selection.type === 'target' && selection.index !== -1) {
+            const scn = scenes[selection.index];
+            scn.tx = transformControl.object.position.x;
+            scn.ty = transformControl.object.position.y;
+            scn.tz = -transformControl.object.position.z;
+            updateSceneUIInputsOnly(selection.index);
+            updateCameraPos(true);
+        }
+    });
+    scene.add(transformControl);
+
+    const worldGroup = new THREE.Group(); scene.add(worldGroup);
+    let gridHelper = new THREE.GridHelper(60, 75, 0x666666, 0x444444); 
+    worldGroup.add(gridHelper);
+    const floorGeo = new THREE.PlaneGeometry(100, 100);
+    const floorMat = new THREE.MeshLambertMaterial({ color: 0x999999 }); 
+    const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+    floorMesh.rotation.x = -Math.PI / 2; floorMesh.position.y = -0.01;
+    floorMesh.receiveShadow = true; floorMesh.visible = false;
+    scene.add(floorMesh);
+
+    let skyMesh;
+    {
+        const vertexShader = `
+            varying vec3 vWorldPosition;
+            void main() {
+                vec4 worldPosition = modelMatrix * vec4( position, 1.0 );
+                vWorldPosition = worldPosition.xyz;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+            }`;
+        const fragmentShader = `
+            uniform vec3 topColor;
+            uniform vec3 bottomColor;
+            uniform float offset;
+            uniform float exponent;
+            varying vec3 vWorldPosition;
+            void main() {
+                float h = normalize( vWorldPosition + offset ).y;
+                gl_FragColor = vec4( mix( bottomColor, topColor, max( pow( max( h , 0.0), exponent ), 0.0 ) ), 1.0 );
+            }`;
+        const uniforms = {
+            topColor: { value: new THREE.Color(0x0066ff) },
+            bottomColor: { value: new THREE.Color(0xffffff) },
+            offset: { value: 33 },
+            exponent: { value: 0.6 }
+        };
+        const skyGeo = new THREE.SphereGeometry( 400, 32, 15 );
+        const skyMat = new THREE.ShaderMaterial({
+            uniforms: uniforms, vertexShader: vertexShader, fragmentShader: fragmentShader, side: THREE.BackSide
+        });
+        skyMesh = new THREE.Mesh( skyGeo, skyMat );
+    }
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); scene.add(ambientLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    dirLight.castShadow = true; 
+    dirLight.shadow.mapSize.set(2048, 2048);
+    dirLight.shadow.camera.left=-30; dirLight.shadow.camera.right=30;
+    dirLight.shadow.camera.top=30; dirLight.shadow.camera.bottom=-30;
+    scene.add(dirLight);
+
+    const markers = new THREE.Group(); scene.add(markers);
+    const camMesh = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshBasicMaterial({color: 0x00ffff, wireframe:true}));
+    const targetMesh = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.5,0.5), new THREE.MeshBasicMaterial({color: 0xff00ff, wireframe:true}));
+    const viewLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({color: 0xffff00}));
+    const camHelper = new THREE.CameraHelper(visualCamera);
+    const sunMesh = new THREE.Mesh(new THREE.SphereGeometry(0.8), new THREE.MeshBasicMaterial({color: 0xffff00}));
+    markers.add(camMesh, targetMesh, viewLine, camHelper, sunMesh);
+
+    const objectGroup = new THREE.Group(); scene.add(objectGroup);
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    canvasMain.addEventListener('pointerdown', (event) => {
+        if (!isGodMode) return;
+        if (transformControl.dragging || transformControl.axis !== null) return;
+
+        const rect = canvasMain.getBoundingClientRect();
+        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, godCamera);
+        
+        const targets = [...objectGroup.children, camMesh, targetMesh];
+        const intersects = raycaster.intersectObjects(targets, true);
+
+        if (intersects.length > 0) {
+            let hitType = null;
+            let hitObj = null;
+
+            for (let i = 0; i < intersects.length; i++) {
+                let target = intersects[i].object;
+                while(target.parent !== objectGroup && target !== camMesh && target !== targetMesh && target.parent !== null) {
+                    target = target.parent;
+                }
+                if (target === camMesh) { hitType = 'camera'; hitObj = target; break; }
+                if (target === targetMesh) { hitType = 'target'; hitObj = target; break; }
+                if (target.parent === objectGroup && !hitType) {
+                    hitType = 'object'; hitObj = target; 
+                }
+            }
+            if (hitType === 'camera') { snapToNearestScene('camera'); }
+            else if (hitType === 'target') { snapToNearestScene('target'); }
+            else if (hitType === 'object') {
+                const index = objectGroup.children.indexOf(hitObj);
+                selectItem('object', index);
+            }
+        } else {
+            selectItem(null, -1);
+        }
+    });
+
+    function snapToNearestScene(type) {
+        if (scenes.length === 0) return;
+        const total = parseFloat(slider.value);
+        const secCnt = scenes.length - 1;
+        let nearestIdx = 0;
+        let minDiff = 999;
+        if (secCnt === 0) nearestIdx = 0;
+        else {
+            for(let i=0; i<scenes.length; i++) {
+                const pos = i / secCnt;
+                const diff = Math.abs(total - pos);
+                if (diff < minDiff) { minDiff = diff; nearestIdx = i; }
+            }
+        }
+        slider.value = (nearestIdx / (secCnt || 1)); 
+        updateCameraPos();
+        selectItem(type, nearestIdx);
+        switchTab('scenes');
+        const card = document.getElementById(`scene-card-${nearestIdx}`);
+        if(card) card.scrollIntoView({behavior: "smooth", block: "center"});
+    }
+
+    function selectItem(type, index) {
+        if (selection.type === type && selection.index === index) return; 
+
+        selection = { type: type, index: index };
+        transformControl.detach();
+
+        if (type === 'object' && index !== -1) {
+            const mesh = objectGroup.children[index];
+            if(mesh) transformControl.attach(mesh);
+            switchTab('objects');
+        } else if (type === 'camera') {
+            transformControl.attach(camMesh);
+        } else if (type === 'target') {
+            transformControl.attach(targetMesh);
+        }
+        renderSceneUI(); renderObjectUI(); 
+    }
+
+    function updateObjectUIInputsOnly(index) {
+        const o = objects[index];
+        const card = document.getElementById(`obj-card-${index}`);
+        if(card) {
+            card.querySelector('.inp-x').value = o.x.toFixed(2);
+            card.querySelector('.inp-y').value = o.y.toFixed(2);
+            card.querySelector('.inp-z').value = o.z.toFixed(2);
+        }
+    }
+    function updateSceneUIInputsOnly(index) {
+        const s = scenes[index];
+        const card = document.getElementById(`scene-card-${index}`);
+        if(card) {
+            const inputs = card.querySelectorAll('input');
+            inputs[0].value = s.cx.toFixed(2); inputs[1].value = s.cy.toFixed(2); inputs[2].value = s.cz.toFixed(2);
+            inputs[3].value = s.tx.toFixed(2); inputs[4].value = s.ty.toFixed(2); inputs[5].value = s.tz.toFixed(2);
+        }
+    }
+
+    window.switchTab = (tabName) => {
+        document.getElementById('tab-scenes').style.display = tabName === 'scenes' ? 'block' : 'none';
+        document.getElementById('tab-objects').style.display = tabName === 'objects' ? 'block' : 'none';
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+    };
+
+    function renderSceneUI() {
+        const list = document.getElementById('scene-list'); list.innerHTML = '';
+        scenes.forEach((s, i) => {
+            const isSelected = (selection.type === 'camera' || selection.type === 'target') && selection.index === i;
+            const card = document.createElement('div');
+            card.id = `scene-card-${i}`;
+            card.className = `card ${isSelected ? 'selected' : ''}`;
+            card.innerHTML = `
+                <div class="card-header"><span>Scene #${i+1}</span>${scenes.length>2?`<button class="btn-delete" onclick="removeScene(${i})">🗑</button>`:''}</div>
+                <div class="xyz-label">カメラ位置ノードン</div>
+                <div class="xyz-row"><div class="xyz-item is-x"><input type="number" value="${s.cx}" oninput="updateScene(${i},'cx',this.value)"></div><div class="xyz-item is-y"><input type="number" value="${s.cy}" oninput="updateScene(${i},'cy',this.value)"></div><div class="xyz-item is-z"><input type="number" value="${s.cz}" oninput="updateScene(${i},'cz',this.value)"></div></div>
+                <div class="xyz-label">カメラ注視点ノードン</div>
+                <div class="xyz-row"><div class="xyz-item is-x"><input type="number" value="${s.tx}" oninput="updateScene(${i},'tx',this.value)"></div><div class="xyz-item is-y"><input type="number" value="${s.ty}" oninput="updateScene(${i},'ty',this.value)"></div><div class="xyz-item is-z"><input type="number" value="${s.tz}" oninput="updateScene(${i},'tz',this.value)"></div></div>`;
+            card.addEventListener('click', (e) => {
+                if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
+                    const secCnt = scenes.length - 1 || 1;
+                    slider.value = i / secCnt;
+                    updateCameraPos();
+                    selectItem('camera', i);
+                }
+            });
+            list.appendChild(card);
+        });
+    }
+
+    function renderObjectUI() {
+        const list = document.getElementById('object-list'); list.innerHTML = '';
+        objects.forEach((o, i) => {
+            const isSelected = (selection.type === 'object' && selection.index === i);
+            const card = document.createElement('div');
+            card.id = `obj-card-${i}`;
+            card.className = `card ${isSelected ? 'selected' : ''}`;
+            
+            // ★ プルダウンで形状変更
+            card.innerHTML = `
+                <div class="card-header">
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        <span>#${i+1}</span>
+                        <select class="type-select" onchange="updateObject(${i},'type',this.value)">
+                            <option value="box" ${o.type==='box'?'selected':''}>直方体</option>
+                            <option value="sphere" ${o.type==='sphere'?'selected':''}>球</option>
+                            <option value="cylinder" ${o.type==='cylinder'?'selected':''}>円柱</option>
+                        </select>
+                        <input type="color" value="${o.color}" oninput="updateObject(${i},'color',this.value)">
+                    </div>
+                    <button class="btn-delete" onclick="removeObject(${i})">🗑</button>
+                </div>
+                <div class="xyz-label">位置 (Pos)</div>
+                <div class="xyz-row">
+                    <div class="xyz-item is-x"><input class="inp-x" type="number" value="${o.x}" oninput="updateObject(${i},'x',this.value)"></div>
+                    <div class="xyz-item is-y"><input class="inp-y" type="number" value="${o.y}" oninput="updateObject(${i},'y',this.value)"></div>
+                    <div class="xyz-item is-z"><input class="inp-z" type="number" value="${o.z}" oninput="updateObject(${i},'z',this.value)"></div>
+                </div>
+                <div class="xyz-label">大きさ (Size)</div>
+                <div class="xyz-row">
+                    <div class="xyz-item is-w"><input type="number" value="${o.w}" min="0.1" step="0.5" oninput="updateObject(${i},'w',this.value)"></div>
+                    <div class="xyz-item is-h"><input type="number" value="${o.h}" min="0.1" step="0.5" oninput="updateObject(${i},'h',this.value)"></div>
+                    <div class="xyz-item is-d"><input type="number" value="${o.d}" min="0.1" step="0.5" oninput="updateObject(${i},'d',this.value)"></div>
+                </div>`;
+            card.addEventListener('click', (e) => {
+                if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'SELECT') {
+                    selectItem('object', i);
+                }
+            });
+            list.appendChild(card);
+        });
+    }
+
+    function rebuild3DObjects() {
+        transformControl.detach();
+        while(objectGroup.children.length > 0){ objectGroup.remove(objectGroup.children[0]); }
+        objects.forEach(o => {
+            let geo;
+            // ★ 形状ごとのGeometry生成（すべて単位サイズ1で作る）
+            if (o.type === 'sphere') {
+                // 半径0.5 * 2 = 直径1
+                geo = new THREE.SphereGeometry(0.5, 32, 16);
+            } else if (o.type === 'cylinder') {
+                // 上半径0.5, 下半径0.5, 高さ1 (Three.jsはY軸向き)
+                geo = new THREE.CylinderGeometry(0.5, 0.5, 1, 32);
+            } else {
+                // Box
+                geo = new THREE.BoxGeometry(1, 1, 1);
+            }
+
+            const mat = new THREE.MeshLambertMaterial({ color: o.color }); 
+            const mesh = new THREE.Mesh(geo, mat);
+            
+            // ★ サイズ指定をScaleで適用する (これで楕円なども表現可能)
+            mesh.scale.set(o.w, o.h, o.d);
+            
+            // Z反転配置
+            mesh.position.set(o.x, o.y, -o.z); 
+            
+            mesh.castShadow = true; mesh.receiveShadow = true;
+            objectGroup.add(mesh);
+
+            // Wireframe Helper (EdgesGeometry)
+            // 球体は見づらくなるので角度制限をつける
+            const threshold = o.type === 'box' ? 1 : 15; 
+            const edges = new THREE.EdgesGeometry(geo, threshold);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial( { color: 0x000000, transparent:true, opacity:0.3 } ));
+            mesh.add(line);
+        });
+        
+        if(selection.type === 'object' && selection.index !== -1 && objectGroup.children[selection.index]) {
+            transformControl.attach(objectGroup.children[selection.index]);
+        } else if (selection.type === 'camera') transformControl.attach(camMesh);
+        else if (selection.type === 'target') transformControl.attach(targetMesh);
+    }
+
+    window.updateScene = (i, k, v) => { scenes[i][k] = parseFloat(v); updateCameraPos(); };
+    window.removeScene = (i) => { if(scenes.length>2){ scenes.splice(i,1); renderSceneUI(); updateCameraPos(); selectItem(null,-1); }};
+    document.getElementById('add-scene-btn').onclick = () => { const last=scenes[scenes.length-1]; scenes.push({...last, cx:last.cx+5}); renderSceneUI(); updateCameraPos(); };
+    
+    window.updateObject = (i, k, v) => { 
+        if(k === 'color' || k === 'type') objects[i][k] = v;
+        else objects[i][k] = parseFloat(v);
+        
+        if(k === 'color' || k === 'w' || k === 'h' || k === 'd' || k === 'type') {
+            rebuild3DObjects();
+        } else {
+            if(objectGroup.children[i]) {
+                const mesh = objectGroup.children[i];
+                if(k==='x') mesh.position.x = parseFloat(v);
+                if(k==='y') mesh.position.y = parseFloat(v);
+                if(k==='z') mesh.position.z = -parseFloat(v); // Z反転
+            }
+        }
+    };
+    
+    window.removeObject = (i) => { objects.splice(i,1); selectItem(null,-1); renderObjectUI(); rebuild3DObjects(); };
+    document.getElementById('add-object-btn').onclick = () => { 
+        // デフォルトはBox
+        objects.push({ type:'box', x:0, y:1, z:0, w:1, h:1, d:1, color:"#ffffff" }); 
+        renderObjectUI(); selectItem('object', objects.length-1); 
+    };
+    
+    function updateLightPos() {
+        const lx = parseFloat(document.getElementById('light-x').value)||0;
+        const ly = parseFloat(document.getElementById('light-y').value)||0;
+        const lz = parseFloat(document.getElementById('light-z').value)||0;
+        dirLight.position.set(lx, ly, -lz); 
+        sunMesh.position.set(lx, ly, -lz);
+    }
+    ['light-x','light-y','light-z'].forEach(id => document.getElementById(id).addEventListener('input', updateLightPos));
+
+    const hajiChk = document.getElementById('haji-mode-chk');
+    function updateWorldStyle() {
+        if (hajiChk.checked) {
+            scene.background = null; 
+            scene.add(skyMesh);
+            scene.fog = new THREE.Fog(0xffffff, 50, 500);
+            gridHelper.visible = false; floorMesh.visible = true;
+            if(!window.whiteGrid) { window.whiteGrid = new THREE.GridHelper(200, 250, 0xdddddd, 0xdddddd); window.whiteGrid.position.y = 0.01; scene.add(window.whiteGrid); }
+            window.whiteGrid.visible = true;
+            floorMesh.material.color.setHex(0xbbbbbb); 
+        } else {
+            scene.remove(skyMesh);
+            scene.background = new THREE.Color(0x333333); scene.fog = null;
+            gridHelper.visible = true; floorMesh.visible = false;
+            if(window.whiteGrid) window.whiteGrid.visible = false;
+        }
+    }
+    hajiChk.addEventListener('change', updateWorldStyle);
+
+    // Frustum Toggle
+    const frustumChk = document.getElementById('frustum-chk');
+    frustumChk.addEventListener('change', () => {
+        camHelper.visible = frustumChk.checked;
+    });
+
+    const slider = document.getElementById('slider');
+    const fovInput = document.getElementById('fov-val');
+    const fovRadios = document.querySelectorAll('input[name="fovType"]');
+    const progressVal = document.getElementById('progress-val');
+    const lerp = (a, b, t) => a + (b - a) * t;
+
+    function getVerticalFOV(fovValue, type) {
+        if (type === 'v') return fovValue;
+        const aspect = 16 / 9;
+        const hRad = fovValue * (Math.PI / 180);
+        const vRad = 2 * Math.atan( Math.tan(hRad / 2) / aspect );
+        return vRad * (180 / Math.PI);
+    }
+
+    function updateCameraPos(skipMeshUpdate = false) {
+        const total = parseFloat(slider.value);
+        progressVal.textContent = total.toFixed(2);
+        
+        let fovVal = parseFloat(fovInput.value);
+        let fovType = document.querySelector('input[name="fovType"]:checked').value;
+        const vFov = getVerticalFOV(fovVal, fovType);
+        
+        gameCamera.fov = vFov;
+        gameCamera.updateProjectionMatrix();
+
+        visualCamera.fov = vFov;
+        visualCamera.updateProjectionMatrix();
+        
+        if (scenes.length < 2) return;
+        const secCnt = scenes.length - 1;
+        let curSec = Math.floor(total * secCnt);
+        if(curSec >= secCnt) curSec = secCnt - 1;
+        let t = (total * secCnt) - curSec;
+        const s1 = scenes[curSec], s2 = scenes[curSec+1];
+        
+        const cx = lerp(s1.cx, s2.cx, t), cy = lerp(s1.cy, s2.cy, t), cz = lerp(s1.cz, s2.cz, t);
+        const tx = lerp(s1.tx, s2.tx, t), ty = lerp(s1.ty, s2.ty, t), tz = lerp(s1.tz, s2.tz, t);
+        
+        const cPos = new THREE.Vector3(cx,cy,-cz); 
+        const tPos = new THREE.Vector3(tx,ty,-tz);
+        
+        if (!skipMeshUpdate) {
+            camMesh.position.copy(cPos); 
+            targetMesh.position.copy(tPos);
+        }
+        viewLine.geometry.setFromPoints([cPos, tPos]);
+        
+        gameCamera.position.copy(cPos); 
+        gameCamera.lookAt(tPos);
+
+        visualCamera.position.copy(cPos);
+        visualCamera.lookAt(tPos);
+        visualCamera.updateMatrixWorld();
+        camHelper.update(); 
+    }
+
+    let isGodMode = true;
+    const viewBtn = document.getElementById('view-btn');
+    viewBtn.onclick = () => {
+        isGodMode = !isGodMode;
+        if(isGodMode) {
+            viewBtn.textContent = "🎥 カメラ視点を見る";
+            viewBtn.classList.remove('active');
+            document.getElementById('preview-box').style.display = 'block'; document.getElementById('preview-label').style.display = 'block';
+            controls.enabled = true; transformControl.enabled = true; 
+            document.getElementById('hint-text').style.display = 'block';
+        } else {
+            viewBtn.textContent = "🗺 神視点に戻る";
+            viewBtn.classList.add('active');
+            document.getElementById('preview-box').style.display = 'none'; document.getElementById('preview-label').style.display = 'none';
+            controls.enabled = false; transformControl.enabled = false; 
+            transformControl.detach();
+            document.getElementById('hint-text').style.display = 'none';
+        }
+    };
+
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        if(isGodMode) {
+            markers.visible = true; rendererMain.render(scene, godCamera);
+            markers.visible = false; rendererPreview.render(scene, gameCamera); markers.visible = true;
+        } else {
+            markers.visible = false; rendererMain.render(scene, gameCamera);
+        }
+    }
+
+    window.addEventListener('resize', () => {
+        // メイン画面のリサイズ
+        const mw = canvasMain.parentElement.clientWidth;
+        const mh = canvasMain.parentElement.clientHeight;
+        rendererMain.setSize(mw, mh);
+        godCamera.aspect = mw / mh;
+        godCamera.updateProjectionMatrix();
+
+        // プレビュー画面のリサイズ
+        // ★スマホ幅(768px未満)なら、解像度自体を小さく(160x90)して軽くする
+        const isMobile = window.innerWidth < 768;
+        const pw = isMobile ? 160 : 320;
+        const ph = isMobile ? 90 : 180;
+        
+        rendererPreview.setSize(pw, ph); // 解像度を設定
+        // ★CSSで強制指定しているので、ここでstyleを上書きする必要はないが、念のためstyleは空にする（CSS優先）
+        canvasPreview.style.width = '100%'; 
+        canvasPreview.style.height = '100%';
+
+        gameCamera.aspect = 16 / 9;
+        gameCamera.updateProjectionMatrix();
+        
+        visualCamera.aspect = 16 / 9;
+        visualCamera.updateProjectionMatrix();
+    });
+
+    // --- 設定メニューの開閉 ---
+    const btnSettings = document.getElementById('btn-settings');
+    const modal = document.getElementById('settings-modal');
+
+    btnSettings.onclick = () => {
+        modal.style.display = 'block';
+    };
+
+    slider.addEventListener('input', () => {
+        selectItem(null, -1);
+        updateCameraPos();
+    });
+    fovInput.addEventListener('input', updateCameraPos);
+    fovRadios.forEach(r => r.addEventListener('change', updateCameraPos));
+    
+    // 初期実行
+    rebuild3DObjects();
+    renderSceneUI(); 
+    renderObjectUI(); 
+    updateWorldStyle(); 
+    updateLightPos(); 
+    updateCameraPos();
+    animate();
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+</script>
+</body>
+</html>
