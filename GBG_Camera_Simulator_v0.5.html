@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>GBG Cam v0.5</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #1a1a1a; color: #eee; font-family: 'Segoe UI', sans-serif; }
+
+        /* --- UI Styles --- */
+        #ui-panel { position: absolute; top: 0; left: 0; width: 380px; height: 100vh; background: #252525; border-right: 1px solid #333; display: flex; flex-direction: column; z-index: 10; }
+        #ui-header { padding: 10px 15px; background: #2a2a2a; border-bottom: 1px solid #333; flex-shrink: 0; }
+        h2 { margin: 0 0 10px 0; font-size: 16px; color: #fff; text-align: center; }
+
+        .tab-group { display: flex; gap: 5px; margin-bottom: 10px; flex-shrink: 0; padding: 0 10px; }
+        .tab-btn { flex: 1; padding: 8px; border: none; cursor: pointer; background: #333; color: #aaa; font-weight: bold; border-radius: 4px 4px 0 0; }
+        .tab-btn.active { background: #444; color: #fff; border-bottom: 2px solid #007acc; }
+
+        #scroll-area { flex: 1; overflow-y: auto; padding: 10px; scrollbar-width: thin; }
+
+        .xyz-label { font-size: 11px; color: #aaa; display: block; margin-bottom: 2px; }
+        .xyz-row { display: flex; gap: 4px; margin-bottom: 6px; }
+        .xyz-item { flex: 1; position: relative; }
+        .xyz-item input { width: 100%; box-sizing: border-box; background: #222; border: 1px solid #444; color: #eee; padding: 4px; border-radius: 3px; font-size: 12px; }
+
+        .is-x::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:#ff4d4d; }
+        .is-y::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:#4dff4d; }
+        .is-z::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:#4d4dff; }
+        .is-w::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:#ddd; }
+        .is-h::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:#aaa; }
+        .is-d::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:#888; }
+
+        .card { background: #333; border: 1px solid #444; border-radius: 6px; padding: 10px; margin-bottom: 10px; }
+        .card.selected { border: 1px solid #007acc; background: #2a3a4a; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: 13px; font-weight: bold; }
+        .btn-delete { background: none; border: none; color: #666; cursor: pointer; font-size: 14px;}
+        .btn-delete:hover { color: #ff4444; }
+
+        input[type="color"] { border: none; width: 30px; height: 20px; padding: 0; background: none; cursor: pointer; }
+        select.type-select { background: #222; color: #eee; border: 1px solid #555; font-size: 11px; border-radius: 3px; padding: 2px;}
+
+        .btn-add { width: 100%; padding: 8px; background: #333; border: 1px dashed #666; color: #aaa; cursor: pointer; }
+        .btn-add:hover { background: #444; color: #fff; }
+
+        .btn-toggle-view { width: 100%; padding: 10px; background: #007acc; color: #fff; border: none; font-weight: bold; border-radius: 4px; margin-bottom:10px;}
+        .btn-toggle-view.active { background: #d32f2f; }
+
+        .easing-container { display: none; background: #222; border: 1px solid #444; border-radius: 4px; padding: 8px; margin-top: 5px; margin-bottom: 10px; }
+        .easing-canvas { width: 100%; height: 80px; background: #1a1a1a; border: 1px solid #333; display:block; margin-bottom:5px; cursor: crosshair; }
+        .bezier-controls { display:flex; flex-direction:column; gap:2px; margin-bottom: 8px; }
+        .bezier-row { display:flex; gap:5px; font-size:10px; color:#aaa; align-items:center; }
+        .bezier-row input { flex:1; }
+        
+        .formula-box { background: #000; border: 1px solid #333; padding: 8px; font-family: monospace; font-size: 10px; color: #00ff00; white-space: pre-wrap; word-break: break-all; margin-top: 5px; border-radius: 3px; }
+        .btn-toggle-graph { font-size: 11px; background: #444; border: 1px solid #555; color: #ccc; cursor: pointer; padding: 2px 8px; border-radius: 3px; }
+        .btn-toggle-graph:hover { background: #555; color: #fff; }
+
+        .duration-input { width: 50px !important; text-align: right; margin-left: 5px; }
+
+        /* Blueprint Modal */
+        #blueprint-modal { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:650px; max-height:85vh; background:#222; border:1px solid #555; box-shadow:0 0 30px rgba(0,0,0,0.8); z-index:9999; border-radius:8px; display:flex; flex-direction:column; }
+        #blueprint-header { padding:15px; border-bottom:1px solid #444; display:flex; justify-content:space-between; align-items:center; background:#2a2a2a; border-radius:8px 8px 0 0; }
+        #blueprint-content { padding:20px; overflow-y:auto; font-family: 'Consolas', 'Monaco', monospace; font-size:13px; color:#ddd; line-height:1.6; }
+        
+        .bp-scene { border:1px solid #444; margin-bottom:20px; padding:0; background:#252525; border-radius:6px; overflow:hidden; }
+        .bp-title { background:#333; padding:8px 12px; color:#fff; font-weight:bold; font-size:14px; border-bottom:1px solid #444; display:flex; justify-content:space-between; }
+        .bp-body { padding:12px; }
+        
+        .bp-section-title { color:#aaa; font-size:11px; margin-top:10px; margin-bottom:4px; border-bottom:1px solid #444; display:inline-block; }
+        .bp-logic-row { margin-left:10px; color:#ccc; display:flex; gap:10px; align-items: baseline; }
+        .bp-logic-key { color:#ce9178; min-width:140px; flex-shrink: 0; }
+        .bp-val { color:#b5cea8; font-weight:bold; font-family:'Consolas'; }
+        .bp-note { color:#6a9955; font-style:italic; margin-top:2px; font-size:12px; margin-left:10px; }
+        .bp-warn { color:#d7ba7d; font-size:12px; margin-left:10px; margin-top:5px; }
+
+        #main-container { position: absolute; top: 0; left: 380px; right: 0; bottom: 0; background: #111; display: flex; justify-content: center; align-items: center; }
+        #aspect-frame { width: 100%; max-width: 177.78vh; aspect-ratio: 16/9; background: #000; position: relative; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
+        #canvas-main { width: 100%; height: 100%; display: block; }
+
+        #preview-box { position: absolute; bottom: 20px; right: 20px; width: 320px; height: 180px; border: 2px solid #ffcc00; background: #000; z-index: 20; display:block;}
+        #preview-label { position: absolute; bottom: 205px; right: 20px; font-size: 12px; color: #ffcc00; font-weight: bold; text-shadow: 1px 1px 2px #000; display:block;}
+        #canvas-preview { width: 100%; height: 100%; display: block; }
+
+        #hint-text { display: none !important; }
+        .toggle-label { font-size: 13px; display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 6px;}
+        .fov-mode { display:flex; gap:5px; font-size:11px; color:#aaa; margin-top:5px; justify-content: flex-end;}
+
+        #settings-modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9998; }
+
+        @media (max-width: 768px) {
+            #ui-panel { width: 100%; height: 50vh; top: auto; bottom: 0; left: 0; border-right: none; border-top: 2px solid #444; }
+            #ui-header { padding: 5px 10px; }
+            #scroll-area { padding-bottom: 60px; }
+            #main-container { left: 0; width: 100%; height: 50vh; bottom: 50vh; top: 0; }
+            #preview-box { width: 120px !important; height: 67.5px !important; top: 10px; right: 10px; bottom: auto; }
+            #preview-label { top: 80px; right: 10px; bottom: auto; font-size: 10px; }
+            
+            #blueprint-modal { width: 95%; max-height:90vh; }
+            /* スマホ用: Blueprintのレイアウト調整 */
+            .bp-logic-row { flex-direction: column; gap: 2px; margin-bottom: 8px; }
+            .bp-logic-key { min-width: auto; font-size: 12px; opacity: 0.8; }
+            .bp-val { font-size: 14px; margin-left: 10px; }
+        }
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
+</head>
+<body>
+
+<div id="ui-panel">
+    <div id="ui-header">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+            <h2 style="margin:0;">GBG Cam v0.5</h2>
+            <div style="display:flex; gap:5px;">
+                <button id="btn-blueprint" style="background:#007acc; color:#fff; border:1px solid #005a9e; padding:5px 10px; border-radius:4px; cursor:pointer; font-size:12px;">📝 </button>
+                <button id="btn-settings" style="background:#444; color:#fff; border:1px solid #666; padding:5px 10px; border-radius:4px; cursor:pointer;">⚙️</button>
+                <button id="view-btn" class="btn-toggle-view" style="margin:0; padding:5px 10px; font-size:12px;">🎥 視点切替</button>
+            </div>
+        </div>
+
+        <div style="margin-top:5px; padding-bottom:5px; border-bottom:1px solid #444;">
+            <div style="font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:center; gap:5px;">
+                    <button id="play-btn" style="background:#007acc; color:#fff; border:none; padding:2px 8px; border-radius:3px; cursor:pointer; font-size:10px;">▶ 再生</button>
+                    <span>Total Time (s)</span>
+                </div>
+                <span id="progress-val" style="font-family:monospace;">0.00s</span>
+            </div>
+            <input type="range" id="slider" min="0" max="1" step="0.01" value="0" style="width:100%; margin-bottom:5px;">
+            
+            <div style="font-size:11px; color:#888; display:flex; justify-content:space-between;">
+                <span>Local Time (0.0-1.0)</span>
+                <span id="local-val" style="font-family:monospace; color:#007acc;">0.00</span>
+            </div>
+            <input type="range" id="local-slider" min="0" max="1" step="0.001" value="0" style="width:100%;">
+        </div>
+    </div>
+
+    <div class="tab-group">
+        <button class="tab-btn active" onclick="switchTab('scenes')">🎬 シーン</button>
+        <button class="tab-btn" onclick="switchTab('objects')">📦 モノ</button>
+    </div>
+
+    <div id="scroll-area">
+        <div id="tab-scenes">
+            <div id="scene-list"></div>
+            <button id="add-scene-btn" class="btn-add">＋ シーン追加</button>
+        </div>
+        <div id="tab-objects" style="display:none;">
+            <div id="object-list"></div>
+            <button id="add-object-btn" class="btn-add">＋ モノノードンを追加</button>
+        </div>
+    </div>
+</div>
+
+<div id="settings-modal" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:280px; background:#252525; border:1px solid #555; box-shadow:0 0 20px rgba(0,0,0,0.8); z-index:9999; border-radius:8px; padding:15px;">
+    <h3 style="margin-top:0; border-bottom:1px solid #444; padding-bottom:10px; margin-bottom:10px;">環境設定</h3>
+    <div style="background:#333; padding:8px; border-radius:4px; margin-bottom:10px; border:1px solid #444;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:12px; font-weight:bold;">FOV (画角)</span>
+            <input type="number" id="fov-val" value="90" style="width:60px; padding:5px;">
+        </div>
+        <div class="fov-mode" style="margin-top:8px;">
+            <label style="margin-right:10px;"><input type="radio" name="fovType" value="v"> 縦(V)</label>
+            <label><input type="radio" name="fovType" value="h" checked> 横(H)</label>
+        </div>
+    </div>
+    
+    <label class="toggle-label" style="margin-top:10px;">
+        <input type="checkbox" id="ghost-chk" checked onchange="updateCameraPos()">
+        <span>👻 軌跡・速度の可視化 (Ghosts)</span>
+    </label>
+
+    <label class="toggle-label" style="margin-top:10px;">
+        <input type="checkbox" id="haji-mode-chk">
+        <span>はじプロ風ワールド (Sky Mode)</span>
+    </label>
+    <label class="toggle-label">
+        <input type="checkbox" id="frustum-chk" checked>
+        <span style="color:#ffaa00;">視錐台を表示 (Frustum)</span>
+    </label>
+    <div style="border-top:1px solid #444; padding-top:10px; margin-top:10px;">
+        <div style="font-size:12px; color:#888; margin-bottom:5px;">☀ 光源位置 (Light)</div>
+        <div class="xyz-row">
+            <div class="xyz-item is-x"><input type="number" id="light-x" value="15"></div>
+            <div class="xyz-item is-y"><input type="number" id="light-y" value="20"></div>
+            <div class="xyz-item is-z"><input type="number" id="light-z" value="10"></div>
+        </div>
+    </div>
+    <button onclick="document.getElementById('settings-modal').style.display='none'" style="width:100%; margin-top:15px; padding:10px; background:#007acc; color:#fff; border:none; border-radius:4px;">閉じる</button>
+</div>
+
+<div id="blueprint-modal" style="display:none;">
+    <div id="blueprint-header">
+        <h3 style="margin:0; font-size:16px;">はじプロ 実装ガイド (Blueprint)</h3>
+        <button onclick="document.getElementById('blueprint-modal').style.display='none'" style="background:none; border:none; color:#fff; cursor:pointer;">✕</button>
+    </div>
+    <div id="blueprint-content">
+        </div>
+</div>
+
+<div id="main-container">
+    <div id="aspect-frame">
+        <canvas id="canvas-main"></canvas>
+    </div>
+</div>
+
+<div id="preview-label">▼ ゲーム画面</div>
+<div id="preview-box">
+    <canvas id="canvas-preview"></canvas>
+</div>
+
+<script>
+    // --- Cubic Bezier Solver (Newton Raphson) ---
+    function solveCubicBezier(p1x, p1y, p2x, p2y, t) {
+        const cx = 3 * p1x;
+        const bx = 3 * (p2x - p1x) - cx;
+        const ax = 1 - cx - bx;
+        const cy = 3 * p1y;
+        const by = 3 * (p2y - p1y) - cy;
+        const ay = 1 - cy - by;
+
+        function sampleCurveX(t) { return ((ax * t + bx) * t + cx) * t; }
+        function sampleCurveY(t) { return ((ay * t + by) * t + cy) * t; }
+        function sampleCurveDerivativeX(t) { return (3 * ax * t + 2 * bx) * t + cx; }
+
+        let t0, t1, t2, x2, d2, i;
+        for (t2 = t, i = 0; i < 8; i++) {
+            x2 = sampleCurveX(t2) - t;
+            if (Math.abs(x2) < 1e-5) return sampleCurveY(t2);
+            d2 = sampleCurveDerivativeX(t2);
+            if (Math.abs(d2) < 1e-5) break;
+            t2 = t2 - x2 / d2;
+        }
+        return sampleCurveY(t2);
+    }
+
+    // --- Formula Generator ---
+    function generateFormula(s) {
+        const p1x = (s.p1x === undefined) ? 0.42 : s.p1x;
+        const p1y = (s.p1y === undefined) ? 0.0 : s.p1y;
+        const p2x = (s.p2x === undefined) ? 0.58 : s.p2x;
+        const p2y = (s.p2y === undefined) ? 1.0 : s.p2y;
+        
+        const cx = 3 * p1x; const bx = 3 * (p2x - p1x) - cx; const ax = 1 - cx - bx;
+        const cy = 3 * p1y; const by = 3 * (p2y - p1y) - cy; const ay = 1 - cy - by;
+        const fmt = (n) => (n >= 0 ? "+" : "") + n.toFixed(3);
+
+        let txt = `Control Points: P1(${p1x.toFixed(2)},${p1y.toFixed(2)}), P2(${p2x.toFixed(2)},${p2y.toFixed(2)})\n`;
+        txt += `Duration: ${s.duration.toFixed(2)}s\n`;
+        txt += `x(t) = ${ax.toFixed(3)}t³ ${fmt(bx)}t² ${fmt(cx)}t  (t:0->1)\n`;
+        txt += `y(t) = ${ay.toFixed(3)}t³ ${fmt(by)}t² ${fmt(cy)}t`;
+        return txt;
+    }
+
+    // --- Data ---
+    let scenes = [
+        { cx: 0, cy: 5, cz: -10, tx: 0, ty: 1, tz: 0, easing: 'linear', p1x:0.42, p1y:0, p2x:0.58, p2y:1, showGraph: false, duration: 1.0 }, 
+        { cx: 8, cy: 8, cz: -2, tx: 0, ty: 1, tz: 0, easing: 'smooth', p1x:0.42, p1y:0, p2x:0.58, p2y:1, showGraph: false, duration: 2.0 }
+    ];
+    let objects = [{ type: 'box', x: 0, y: 1, z: 0, w: 2, h: 2, d: 2, color: "#ffffff" }];
+    let selection = { type: null, index: -1 };
+
+    // --- Three.js Init ---
+    const scene = new THREE.Scene();
+    const canvasMain = document.getElementById('canvas-main');
+    const rendererMain = new THREE.WebGLRenderer({ canvas: canvasMain, antialias: true, alpha: true });
+    rendererMain.shadowMap.enabled = true;
+    
+    const canvasPreview = document.getElementById('canvas-preview');
+    const rendererPreview = new THREE.WebGLRenderer({ canvas: canvasPreview, antialias: true, alpha: true });
+    rendererPreview.shadowMap.enabled = true;
+
+    const godCamera = new THREE.PerspectiveCamera(45, 16/9, 0.1, 1000);
+    godCamera.position.set(20, 20, 20);
+    const gameCamera = new THREE.PerspectiveCamera(60, 16/9, 0.1, 1000);
+    const visualCamera = new THREE.PerspectiveCamera(60, 16/9, 0.1, 40); 
+    
+    const controls = new THREE.OrbitControls(godCamera, canvasMain);
+    controls.enableDamping = true;
+
+    const transformControl = new THREE.TransformControls(godCamera, canvasMain);
+    transformControl.setTranslationSnap(0.1); 
+    if (window.innerWidth < 768) transformControl.setSize(2.0);
+
+    transformControl.addEventListener('dragging-changed', function (event) { controls.enabled = !event.value; });
+    transformControl.addEventListener('change', function () {
+        if (!transformControl.object) return;
+        if (selection.type === 'object' && selection.index !== -1) {
+            const obj = objects[selection.index];
+            obj.x = transformControl.object.position.x;
+            obj.y = transformControl.object.position.y;
+            obj.z = -transformControl.object.position.z;
+            updateObjectUIInputsOnly(selection.index);
+        } else if (selection.type === 'camera' && selection.index !== -1) {
+            const scn = scenes[selection.index];
+            scn.cx = transformControl.object.position.x;
+            scn.cy = transformControl.object.position.y;
+            scn.cz = -transformControl.object.position.z;
+            updateSceneUIInputsOnly(selection.index);
+            updateCameraPos(true);
+        } else if (selection.type === 'target' && selection.index !== -1) {
+            const scn = scenes[selection.index];
+            scn.tx = transformControl.object.position.x;
+            scn.ty = transformControl.object.position.y;
+            scn.tz = -transformControl.object.position.z;
+            updateSceneUIInputsOnly(selection.index);
+            updateCameraPos(true);
+        }
+    });
+    scene.add(transformControl);
+
+    const worldGroup = new THREE.Group(); scene.add(worldGroup);
+    let gridHelper = new THREE.GridHelper(60, 75, 0x666666, 0x444444); worldGroup.add(gridHelper);
+    const floorGeo = new THREE.PlaneGeometry(100, 100);
+    const floorMat = new THREE.MeshLambertMaterial({ color: 0x999999 }); 
+    const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+    floorMesh.rotation.x = -Math.PI / 2; floorMesh.position.y = -0.01;
+    floorMesh.receiveShadow = true; floorMesh.visible = false;
+    scene.add(floorMesh);
+
+    let skyMesh;
+    {
+        const vertexShader = `varying vec3 vWorldPosition; void main() { vec4 worldPosition = modelMatrix * vec4( position, 1.0 ); vWorldPosition = worldPosition.xyz; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`;
+        const fragmentShader = `uniform vec3 topColor; uniform vec3 bottomColor; uniform float offset; uniform float exponent; varying vec3 vWorldPosition; void main() { float h = normalize( vWorldPosition + offset ).y; gl_FragColor = vec4( mix( bottomColor, topColor, max( pow( max( h , 0.0), exponent ), 0.0 ) ), 1.0 ); }`;
+        const uniforms = { topColor: { value: new THREE.Color(0x0066ff) }, bottomColor: { value: new THREE.Color(0xffffff) }, offset: { value: 33 }, exponent: { value: 0.6 } };
+        const skyGeo = new THREE.SphereGeometry( 400, 32, 15 );
+        const skyMat = new THREE.ShaderMaterial({ uniforms: uniforms, vertexShader: vertexShader, fragmentShader: fragmentShader, side: THREE.BackSide });
+        skyMesh = new THREE.Mesh( skyGeo, skyMat );
+    }
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); scene.add(ambientLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    dirLight.castShadow = true; dirLight.shadow.mapSize.set(2048, 2048);
+    dirLight.shadow.camera.left=-30; dirLight.shadow.camera.right=30; dirLight.shadow.camera.top=30; dirLight.shadow.camera.bottom=-30;
+    scene.add(dirLight);
+
+    const markers = new THREE.Group(); scene.add(markers);
+    const camMesh = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshBasicMaterial({color: 0x00ffff, wireframe:true}));
+    const targetMesh = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.5,0.5), new THREE.MeshBasicMaterial({color: 0xff00ff, wireframe:true}));
+    const viewLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({color: 0xffff00}));
+    const camHelper = new THREE.CameraHelper(visualCamera);
+    const sunMesh = new THREE.Mesh(new THREE.SphereGeometry(0.8), new THREE.MeshBasicMaterial({color: 0xffff00}));
+    const ghostGroup = new THREE.Group(); markers.add(ghostGroup);
+    markers.add(camMesh, targetMesh, viewLine, camHelper, sunMesh);
+
+    const objectGroup = new THREE.Group(); scene.add(objectGroup);
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    // --- Interaction ---
+    canvasMain.addEventListener('pointerdown', (event) => {
+        if (!isGodMode) return;
+        if (transformControl.dragging || transformControl.axis !== null) return;
+        const rect = canvasMain.getBoundingClientRect();
+        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse, godCamera);
+        const targets = [...objectGroup.children, camMesh, targetMesh];
+        const intersects = raycaster.intersectObjects(targets, true);
+        if (intersects.length > 0) {
+            let hitType = null, hitObj = null;
+            for (let i = 0; i < intersects.length; i++) {
+                let target = intersects[i].object;
+                while(target.parent !== objectGroup && target !== camMesh && target !== targetMesh && target.parent !== null) target = target.parent;
+                if (target === camMesh) { hitType = 'camera'; hitObj = target; break; }
+                if (target === targetMesh) { hitType = 'target'; hitObj = target; break; }
+                if (target.parent === objectGroup && !hitType) { hitType = 'object'; hitObj = target; }
+            }
+            if (hitType === 'camera') snapToNearestScene('camera');
+            else if (hitType === 'target') snapToNearestScene('target');
+            else if (hitType === 'object') selectItem('object', objectGroup.children.indexOf(hitObj));
+        } else {
+            selectItem(null, -1);
+        }
+    });
+
+    // --- Time Logic ---
+    function calcTotalDuration() {
+        let t = 0;
+        for(let i=1; i<scenes.length; i++) t += (scenes[i].duration || 1.0);
+        return t;
+    }
+
+    function getTimeInfo(globalTime) {
+        if (globalTime <= 0) return { index: 0, t: 0 };
+        let tAccum = 0;
+        for(let i=1; i<scenes.length; i++) {
+            let dur = scenes[i].duration || 1.0;
+            if (globalTime < tAccum + dur) {
+                return { index: i-1, t: (globalTime - tAccum) / dur };
+            }
+            tAccum += dur;
+        }
+        return { index: scenes.length - 2, t: 1.0 }; 
+    }
+
+    function snapToNearestScene(type) {
+        if (scenes.length === 0) return;
+        let globalTime = parseFloat(slider.value);
+        let tAccum = 0;
+        let bestIdx = 0;
+        let minDiff = 9999;
+        scenes.forEach((s, i) => {
+            if (i > 0) tAccum += (s.duration || 1.0);
+            let sceneTime = 0;
+            if(i > 0) {
+                let temp = 0;
+                for(let k=1; k<=i; k++) temp += scenes[k].duration;
+                sceneTime = temp;
+            } else { sceneTime = 0; }
+            let diff = Math.abs(globalTime - sceneTime);
+            if(diff < minDiff) { minDiff = diff; bestIdx = i; }
+        });
+        let exactTime = 0;
+        for(let k=1; k<=bestIdx; k++) exactTime += scenes[k].duration;
+        slider.value = exactTime;
+        updateCameraPos();
+        selectItem(type, bestIdx);
+        switchTab('scenes');
+        const card = document.getElementById(`scene-card-${bestIdx}`);
+        if(card) card.scrollIntoView({behavior: "smooth", block: "center"});
+    }
+
+    function selectItem(type, index) {
+        if (selection.type === type && selection.index === index) return; 
+        selection = { type: type, index: index };
+        transformControl.detach();
+        if (type === 'object' && index !== -1) {
+            const mesh = objectGroup.children[index];
+            if(mesh) transformControl.attach(mesh);
+            switchTab('objects');
+        } else if (type === 'camera') transformControl.attach(camMesh);
+        else if (type === 'target') transformControl.attach(targetMesh);
+        renderSceneUI(); renderObjectUI(); 
+    }
+
+    function updateObjectUIInputsOnly(index) {
+        const o = objects[index];
+        const card = document.getElementById(`obj-card-${index}`);
+        if(card) {
+            card.querySelector('.inp-x').value = o.x.toFixed(2);
+            card.querySelector('.inp-y').value = o.y.toFixed(2);
+            card.querySelector('.inp-z').value = o.z.toFixed(2);
+        }
+    }
+    function updateSceneUIInputsOnly(index) {
+        const s = scenes[index];
+        const card = document.getElementById(`scene-card-${index}`);
+        if(card) {
+            const inputs = card.querySelectorAll('input.pos-input');
+            if(inputs.length >= 6) {
+                inputs[0].value = s.cx.toFixed(2); inputs[1].value = s.cy.toFixed(2); inputs[2].value = s.cz.toFixed(2);
+                inputs[3].value = s.tx.toFixed(2); inputs[4].value = s.ty.toFixed(2); inputs[5].value = s.tz.toFixed(2);
+            }
+        }
+    }
+
+    window.switchTab = (tabName) => {
+        document.getElementById('tab-scenes').style.display = tabName === 'scenes' ? 'block' : 'none';
+        document.getElementById('tab-objects').style.display = tabName === 'objects' ? 'block' : 'none';
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        if(tabName === 'scenes') renderSceneUI();
+    };
+
+    function drawBezierGraph(canvas, s) {
+        if(!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width; const h = canvas.height;
+        ctx.clearRect(0,0,w,h);
+        ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0, h); ctx.lineTo(w, 0); ctx.stroke();
+        
+        ctx.strokeStyle = '#007acc'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(0, h);
+        const steps = 50;
+        for(let i=0; i<=steps; i++) {
+            let t = i/steps;
+            let val;
+            if(s.easing === 'linear') val = t;
+            else if(s.easing === 'cut') val = (t >= 0.99) ? 1 : 0;
+            else if(s.easing === 'smooth') val = t * t * (3 - 2 * t);
+            else if(s.easing === 'custom') val = solveCubicBezier(s.p1x||0.42, s.p1y||0, s.p2x||0.58, s.p2y||1, t);
+            ctx.lineTo(t * w, h - (val * h));
+        }
+        ctx.stroke();
+    }
+
+    window.toggleGraph = (i) => {
+        scenes[i].showGraph = !scenes[i].showGraph;
+        renderSceneUI();
+    };
+
+    function renderSceneUI() {
+        const list = document.getElementById('scene-list'); list.innerHTML = '';
+        scenes.forEach((s, i) => {
+            const isSelected = (selection.type === 'camera' || selection.type === 'target') && selection.index === i;
+            const card = document.createElement('div');
+            card.id = `scene-card-${i}`;
+            card.className = `card ${isSelected ? 'selected' : ''}`;
+            
+            let easingHtml = '';
+            if (i > 0) {
+                const showStyle = s.showGraph ? 'block' : 'none';
+                let customControls = '';
+                let formulaHtml = '';
+
+                if(s.easing === 'custom') {
+                    if(s.p1x === undefined) { s.p1x=0.42; s.p1y=0; s.p2x=0.58; s.p2y=1; }
+                    customControls = `
+                    <div class="bezier-controls">
+                        <div class="bezier-row"><span style="color:#ff4444">P1</span> X:<input type="range" min="0" max="1" step="0.01" value="${s.p1x}" oninput="updateBezier(${i},'p1x',this.value)"> Y:<input type="range" min="-0.5" max="1.5" step="0.01" value="${s.p1y}" oninput="updateBezier(${i},'p1y',this.value)"></div>
+                        <div class="bezier-row"><span style="color:#44ff44">P2</span> X:<input type="range" min="0" max="1" step="0.01" value="${s.p2x}" oninput="updateBezier(${i},'p2x',this.value)"> Y:<input type="range" min="-0.5" max="1.5" step="0.01" value="${s.p2y}" oninput="updateBezier(${i},'p2y',this.value)"></div>
+                    </div>`;
+                    formulaHtml = `<div class="formula-box" id="formula-${i}">${generateFormula(s)}</div>`;
+                }
+
+                easingHtml = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        <span style="font-size:11px; color:#aaa;">To #${i+1}</span>
+                        <select class="type-select" style="width:70px;" onchange="updateScene(${i},'easing',this.value)">
+                            <option value="linear" ${s.easing==='linear'?'selected':''}>一定</option>
+                            <option value="smooth" ${s.easing==='smooth'?'selected':''}>滑らか</option>
+                            <option value="cut" ${s.easing==='cut'?'selected':''}>カット</option>
+                            <option value="custom" ${s.easing==='custom'?'selected':''}>カスタム</option>
+                        </select>
+                        <span style="font-size:11px;">⏱</span>
+                        <input type="number" class="duration-input" value="${s.duration || 1.0}" step="0.1" min="0.1" onchange="updateScene(${i},'duration',this.value)">
+                        <span style="font-size:10px; color:#aaa;">秒</span>
+                    </div>
+                    <button class="btn-toggle-graph" onclick="toggleGraph(${i})">${s.showGraph?'▲':'📉'}</button>
+                </div>
+                <div class="easing-container" style="display:${showStyle}">
+                    <canvas id="easing-canvas-${i}" class="easing-canvas" width="300" height="80"></canvas>
+                    ${customControls}
+                    ${formulaHtml}
+                </div>`;
+            }
+
+            card.innerHTML = `
+                <div class="card-header"><span>Scene #${i+1}</span>${scenes.length>2?`<button class="btn-delete" onclick="removeScene(${i})">🗑</button>`:''}</div>
+                ${easingHtml}
+                <div class="xyz-label">カメラ位置</div>
+                <div class="xyz-row"><div class="xyz-item is-x"><input class="pos-input" type="number" value="${s.cx}" oninput="updateScene(${i},'cx',this.value)"></div><div class="xyz-item is-y"><input class="pos-input" type="number" value="${s.cy}" oninput="updateScene(${i},'cy',this.value)"></div><div class="xyz-item is-z"><input class="pos-input" type="number" value="${s.cz}" oninput="updateScene(${i},'cz',this.value)"></div></div>
+                <div class="xyz-label">注視点</div>
+                <div class="xyz-row"><div class="xyz-item is-x"><input class="pos-input" type="number" value="${s.tx}" oninput="updateScene(${i},'tx',this.value)"></div><div class="xyz-item is-y"><input class="pos-input" type="number" value="${s.ty}" oninput="updateScene(${i},'ty',this.value)"></div><div class="xyz-item is-z"><input class="pos-input" type="number" value="${s.tz}" oninput="updateScene(${i},'tz',this.value)"></div></div>`;
+            
+            card.addEventListener('click', (e) => {
+                if(!['INPUT','BUTTON','SELECT','CANVAS'].includes(e.target.tagName)) {
+                    let t = 0;
+                    for(let k=1; k<=i; k++) t += (scenes[k].duration || 1.0);
+                    slider.value = t; 
+                    updateCameraPos(); 
+                    selectItem('camera', i);
+                }
+            });
+            list.appendChild(card);
+            
+            if(i > 0 && s.showGraph) {
+                setTimeout(() => drawBezierGraph(document.getElementById(`easing-canvas-${i}`), s), 0);
+            }
+        });
+    }
+
+    function renderObjectUI() {
+        const list = document.getElementById('object-list'); list.innerHTML = '';
+        objects.forEach((o, i) => {
+            const isSelected = (selection.type === 'object' && selection.index === i);
+            const card = document.createElement('div');
+            card.id = `obj-card-${i}`;
+            card.className = `card ${isSelected ? 'selected' : ''}`;
+            
+            card.innerHTML = `
+                <div class="card-header">
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        <span>#${i+1}</span>
+                        <select class="type-select" onchange="updateObject(${i},'type',this.value)">
+                            <option value="box" ${o.type==='box'?'selected':''}>直方体</option>
+                            <option value="sphere" ${o.type==='sphere'?'selected':''}>球</option>
+                            <option value="cylinder" ${o.type==='cylinder'?'selected':''}>円柱</option>
+                        </select>
+                        <input type="color" value="${o.color}" oninput="updateObject(${i},'color',this.value)">
+                    </div>
+                    <button class="btn-delete" onclick="removeObject(${i})">🗑</button>
+                </div>
+                <div class="xyz-label">位置</div>
+                <div class="xyz-row">
+                    <div class="xyz-item is-x"><input class="inp-x" type="number" value="${o.x}" oninput="updateObject(${i},'x',this.value)"></div>
+                    <div class="xyz-item is-y"><input class="inp-y" type="number" value="${o.y}" oninput="updateObject(${i},'y',this.value)"></div>
+                    <div class="xyz-item is-z"><input class="inp-z" type="number" value="${o.z}" oninput="updateObject(${i},'z',this.value)"></div>
+                </div>
+                <div class="xyz-label">サイズ</div>
+                <div class="xyz-row">
+                    <div class="xyz-item is-w"><input type="number" value="${o.w}" min="0.1" step="0.5" oninput="updateObject(${i},'w',this.value)"></div>
+                    <div class="xyz-item is-h"><input type="number" value="${o.h}" min="0.1" step="0.5" oninput="updateObject(${i},'h',this.value)"></div>
+                    <div class="xyz-item is-d"><input type="number" value="${o.d}" min="0.1" step="0.5" oninput="updateObject(${i},'d',this.value)"></div>
+                </div>`;
+            card.addEventListener('click', (e) => { if(!['INPUT','BUTTON','SELECT'].includes(e.target.tagName)) selectItem('object', i); });
+            list.appendChild(card);
+        });
+    }
+
+    function rebuild3DObjects() {
+        transformControl.detach();
+        while(objectGroup.children.length > 0){ objectGroup.remove(objectGroup.children[0]); }
+        objects.forEach(o => {
+            let geo;
+            if (o.type === 'sphere') geo = new THREE.SphereGeometry(0.5, 32, 16);
+            else if (o.type === 'cylinder') geo = new THREE.CylinderGeometry(0.5, 0.5, 1, 32);
+            else geo = new THREE.BoxGeometry(1, 1, 1);
+            const mat = new THREE.MeshLambertMaterial({ color: o.color }); 
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.scale.set(o.w, o.h, o.d);
+            mesh.position.set(o.x, o.y, -o.z); 
+            mesh.castShadow = true; mesh.receiveShadow = true;
+            objectGroup.add(mesh);
+            const threshold = o.type === 'box' ? 1 : 15; 
+            const edges = new THREE.EdgesGeometry(geo, threshold);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial( { color: 0x000000, transparent:true, opacity:0.3 } ));
+            mesh.add(line);
+        });
+        if(selection.type === 'object' && selection.index !== -1 && objectGroup.children[selection.index]) transformControl.attach(objectGroup.children[selection.index]);
+        else if (selection.type === 'camera') transformControl.attach(camMesh);
+        else if (selection.type === 'target') transformControl.attach(targetMesh);
+    }
+
+    window.updateScene = (i, k, v) => { 
+        if(k === 'easing') { scenes[i][k] = v; renderSceneUI(); }
+        else if(k === 'duration') {
+             scenes[i][k] = parseFloat(v);
+             slider.max = calcTotalDuration();
+             if(scenes[i].showGraph) {
+                const box = document.getElementById(`formula-${i}`);
+                if(box) box.textContent = generateFormula(scenes[i]);
+             }
+        }
+        else scenes[i][k] = parseFloat(v);
+        updateCameraPos(); 
+    };
+    
+    window.updateBezier = (i, k, v) => {
+        scenes[i][k] = parseFloat(v);
+        drawBezierGraph(document.getElementById(`easing-canvas-${i}`), scenes[i]);
+        const box = document.getElementById(`formula-${i}`);
+        if(box) box.textContent = generateFormula(scenes[i]);
+        updateCameraPos();
+    };
+
+    window.removeScene = (i) => { 
+        if(scenes.length > 2){ 
+            scenes.splice(i,1); 
+            slider.max = calcTotalDuration(); 
+            renderSceneUI(); updateCameraPos(); selectItem(null,-1); 
+        }
+    };
+    document.getElementById('add-scene-btn').onclick = () => { 
+        const last=scenes[scenes.length-1]; 
+        scenes.push({...last, cx:last.cx+5, easing:'linear', p1x:0.42, p1y:0, p2x:0.58, p2y:1, showGraph:false, duration:1.0}); 
+        slider.max = calcTotalDuration(); 
+        slider.value = slider.max; // jump to end
+        renderSceneUI(); updateCameraPos(); 
+    };
+    window.updateObject = (i, k, v) => { 
+        if(k === 'color' || k === 'type') objects[i][k] = v; else objects[i][k] = parseFloat(v);
+        if(k === 'color' || k === 'w' || k === 'h' || k === 'd' || k === 'type') rebuild3DObjects();
+        else {
+            if(objectGroup.children[i]) {
+                const mesh = objectGroup.children[i];
+                if(k==='x') mesh.position.x = parseFloat(v); if(k==='y') mesh.position.y = parseFloat(v); if(k==='z') mesh.position.z = -parseFloat(v);
+            }
+        }
+    };
+    window.removeObject = (i) => { objects.splice(i,1); selectItem(null,-1); renderObjectUI(); rebuild3DObjects(); };
+    document.getElementById('add-object-btn').onclick = () => { objects.push({ type:'box', x:0, y:1, z:0, w:1, h:1, d:1, color:"#ffffff" }); renderObjectUI(); selectItem('object', objects.length-1); };
+    
+    function updateLightPos() {
+        const lx = parseFloat(document.getElementById('light-x').value)||0; const ly = parseFloat(document.getElementById('light-y').value)||0; const lz = parseFloat(document.getElementById('light-z').value)||0;
+        dirLight.position.set(lx, ly, -lz); sunMesh.position.set(lx, ly, -lz);
+    }
+    ['light-x','light-y','light-z'].forEach(id => document.getElementById(id).addEventListener('input', updateLightPos));
+
+    const hajiChk = document.getElementById('haji-mode-chk');
+    function updateWorldStyle() {
+        if (hajiChk.checked) {
+            scene.background = null; scene.add(skyMesh); scene.fog = new THREE.Fog(0xffffff, 50, 500);
+            gridHelper.visible = false; floorMesh.visible = true;
+            if(!window.whiteGrid) { window.whiteGrid = new THREE.GridHelper(200, 250, 0xdddddd, 0xdddddd); window.whiteGrid.position.y = 0.01; scene.add(window.whiteGrid); }
+            window.whiteGrid.visible = true; floorMesh.material.color.setHex(0xbbbbbb); 
+        } else {
+            scene.remove(skyMesh); scene.background = new THREE.Color(0x333333); scene.fog = null;
+            gridHelper.visible = true; floorMesh.visible = false;
+            if(window.whiteGrid) window.whiteGrid.visible = false;
+        }
+    }
+    hajiChk.addEventListener('change', updateWorldStyle);
+    document.getElementById('frustum-chk').addEventListener('change', (e) => { camHelper.visible = e.target.checked; });
+
+    // --- Main Logic ---
+    const slider = document.getElementById('slider');
+    const localSlider = document.getElementById('local-slider');
+    const progressVal = document.getElementById('progress-val');
+    const localVal = document.getElementById('local-val');
+    const fovInput = document.getElementById('fov-val');
+    const fovRadios = document.querySelectorAll('input[name="fovType"]');
+    const lerp = (a, b, t) => a + (b - a) * t;
+
+    function getEasedT(sceneObj, t) {
+        if (!sceneObj) return t;
+        if (sceneObj.easing === 'smooth') return t * t * (3 - 2 * t);
+        if (sceneObj.easing === 'cut') return (t >= 0.999) ? 1 : 0;
+        if (sceneObj.easing === 'custom') return solveCubicBezier(sceneObj.p1x||0.42, sceneObj.p1y||0, sceneObj.p2x||0.58, sceneObj.p2y||1, t);
+        return t; 
+    }
+
+    // --- Ghost Visualization ---
+    function updateGhosts(currentIndex) {
+        const showGhosts = document.getElementById('ghost-chk').checked;
+        ghostGroup.clear();
+        if (!showGhosts || currentIndex >= scenes.length - 1) return;
+        const s1 = scenes[currentIndex];
+        const s2 = scenes[currentIndex + 1];
+        if(!s2) return;
+
+        const steps = 20; 
+        for(let i=0; i<=steps; i++) {
+            let t = i / steps;
+            let et = getEasedT(s2, t);
+            let gx = lerp(s1.cx, s2.cx, et);
+            let gy = lerp(s1.cy, s2.cy, et);
+            let gz = lerp(s1.cz, s2.cz, et);
+            const dotGeo = new THREE.SphereGeometry(0.08);
+            const dotMat = new THREE.MeshBasicMaterial({ color: new THREE.Color().setHSL(0.3 - (t*0.3), 1.0, 0.5) });
+            const dot = new THREE.Mesh(dotGeo, dotMat);
+            dot.position.set(gx, gy, -gz);
+            ghostGroup.add(dot);
+        }
+    }
+
+    function updateCameraPos(skipMeshUpdate = false) {
+        if(!slider) return;
+        let globalTime = parseFloat(slider.value);
+        let totalDur = calcTotalDuration();
+        if (globalTime > totalDur) globalTime = totalDur; 
+        if (globalTime < 0) globalTime = 0;
+        
+        if(progressVal) progressVal.textContent = globalTime.toFixed(2) + 's';
+        
+        const info = getTimeInfo(globalTime);
+        const curSec = info.index;
+        const linearT = info.t;
+
+        if (localSlider && document.activeElement !== localSlider) {
+            localSlider.value = linearT;
+            if(localVal) localVal.textContent = linearT.toFixed(2);
+        }
+
+        let fovVal = parseFloat(fovInput.value) || 90;
+        let fovType = 'h';
+        const ft = document.querySelector('input[name="fovType"]:checked'); if(ft) fovType = ft.value;
+        const aspect = 16/9;
+        const vFov = (fovType === 'v') ? fovVal : (2 * Math.atan( Math.tan((fovVal * Math.PI / 180) / 2) / aspect ) * (180 / Math.PI));
+        gameCamera.fov = vFov; gameCamera.updateProjectionMatrix();
+        visualCamera.fov = vFov; visualCamera.updateProjectionMatrix();
+        
+        if (scenes.length < 2) {
+            if(scenes[0]) {
+                const p = new THREE.Vector3(scenes[0].cx, scenes[0].cy, -scenes[0].cz);
+                const t = new THREE.Vector3(scenes[0].tx, scenes[0].ty, -scenes[0].tz);
+                if(!skipMeshUpdate && camMesh) { camMesh.position.copy(p); targetMesh.position.copy(t); }
+                gameCamera.position.copy(p); gameCamera.lookAt(t); visualCamera.position.copy(p); visualCamera.lookAt(t);
+            }
+            return;
+        }
+
+        const nextScene = scenes[curSec + 1];
+        let easedT = getEasedT(nextScene, linearT);
+
+        const s1 = scenes[curSec];
+        const s2 = scenes[curSec+1];
+        
+        const cx = lerp(s1.cx, s2.cx, easedT), cy = lerp(s1.cy, s2.cy, easedT), cz = lerp(s1.cz, s2.cz, easedT);
+        const tx = lerp(s1.tx, s2.tx, easedT), ty = lerp(s1.ty, s2.ty, easedT), tz = lerp(s1.tz, s2.tz, easedT);
+        
+        const cPos = new THREE.Vector3(cx,cy,-cz); 
+        const tPos = new THREE.Vector3(tx,ty,-tz);
+        
+        if (!skipMeshUpdate) { camMesh.position.copy(cPos); targetMesh.position.copy(tPos); }
+        viewLine.geometry.setFromPoints([cPos, tPos]);
+        gameCamera.position.copy(cPos); gameCamera.lookAt(tPos);
+        visualCamera.position.copy(cPos); visualCamera.lookAt(tPos); visualCamera.updateMatrixWorld();
+        camHelper.update(); 
+        
+        updateGhosts(curSec);
+    }
+
+    if(localSlider) {
+        localSlider.addEventListener('input', () => {
+            let globalTime = parseFloat(slider.value);
+            const info = getTimeInfo(globalTime);
+            let sectionStart = 0;
+            for(let i=1; i<=info.index; i++) sectionStart += (scenes[i].duration||1.0);
+            let curDuration = 1.0;
+            if(scenes[info.index+1]) curDuration = scenes[info.index+1].duration || 1.0;
+            let localValNum = parseFloat(localSlider.value);
+            slider.value = sectionStart + (localValNum * curDuration);
+            if(localVal) localVal.textContent = localValNum.toFixed(2);
+            updateCameraPos();
+        });
+    }
+
+    let isGodMode = true; let isPlaying = false;
+    const playBtn = document.getElementById('play-btn');
+    const viewBtn = document.getElementById('view-btn');
+
+    playBtn.onclick = () => {
+        isPlaying = !isPlaying;
+        playBtn.textContent = isPlaying ? "■ 停止" : "▶ 再生";
+        playBtn.style.background = isPlaying ? "#d32f2f" : "#007acc";
+        if (isPlaying && parseFloat(slider.value) >= parseFloat(slider.max)) slider.value = 0;
+    };
+
+    viewBtn.onclick = () => {
+        isGodMode = !isGodMode;
+        if(isGodMode) {
+            viewBtn.textContent = "🎥 視点切替"; viewBtn.classList.remove('active');
+            document.getElementById('preview-box').style.display = 'block'; document.getElementById('preview-label').style.display = 'block';
+            controls.enabled = true; transformControl.enabled = true; 
+        } else {
+            viewBtn.textContent = "🗺 神視点に戻る"; viewBtn.classList.add('active');
+            document.getElementById('preview-box').style.display = 'none'; document.getElementById('preview-label').style.display = 'none';
+            controls.enabled = false; transformControl.enabled = false; transformControl.detach();
+        }
+    };
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const dt = clock.getDelta();
+        if (isPlaying) {
+            let newVal = parseFloat(slider.value) + dt;
+            if (newVal >= parseFloat(slider.max)) { 
+                newVal = parseFloat(slider.max); 
+                isPlaying = false; 
+                playBtn.textContent = "▶ 再生"; 
+                playBtn.style.background = "#007acc"; 
+            }
+            slider.value = newVal; 
+            updateCameraPos(); 
+        }
+        controls.update();
+        if(isGodMode) {
+            markers.visible = true; rendererMain.render(scene, godCamera);
+            markers.visible = false; rendererPreview.render(scene, gameCamera); markers.visible = true;
+        } else {
+            markers.visible = false; rendererMain.render(scene, gameCamera);
+        }
+    }
+
+    const btnSettings = document.getElementById('btn-settings');
+    const settingsModal = document.getElementById('settings-modal');
+    if(btnSettings && settingsModal) { btnSettings.onclick = () => { settingsModal.style.display = 'block'; }; }
+
+    // --- Blueprint Logic ---
+    const btnBlueprint = document.getElementById('btn-blueprint');
+    const bpModal = document.getElementById('blueprint-modal');
+    const bpContent = document.getElementById('blueprint-content');
+
+    if(btnBlueprint && bpModal) {
+        btnBlueprint.onclick = () => {
+            bpContent.innerHTML = '';
+            let tAccum = 0;
+            
+            for(let i=0; i<scenes.length-1; i++) {
+                const s1 = scenes[i];
+                const s2 = scenes[i+1];
+                const dur = s2.duration || 1.0;
+                const startTime = tAccum;
+                const endTime = tAccum + dur;
+                tAccum += dur;
+
+                const div = document.createElement('div');
+                div.className = 'bp-scene';
+                
+                let logicHtml = '';
+                if(s2.easing === 'cut') {
+                    logicHtml = `
+                    <div class="bp-body">
+                        <div class="bp-note">※ カット (Cut) なので時間に依存しません。以下の定数をカメラに入力してください</div>
+                        <div style="margin-top:5px;">
+                            <div class="bp-logic-row"><span class="bp-logic-key">比較 (Compare):</span><span>Global Time >= <span class="bp-val">${startTime.toFixed(2)}</span> ならON</span></div>
+                            <div class="bp-logic-row"><span class="bp-logic-key">出力 (Output):</span><span>カメラ・注視点に以下の定数を入力</span></div>
+                        </div>
+                        <div style="margin-top:10px; border-top:1px dashed #444; padding-top:5px;">
+                            <div style="color:#aaa; font-size:11px;">▼ カメラ位置 (Camera Pos)</div>
+                            <div class="bp-logic-row"><span class="bp-logic-key">X, Y, Z:</span><span class="bp-val">${s2.cx.toFixed(2)}, ${s2.cy.toFixed(2)}, ${s2.cz.toFixed(2)}</span></div>
+                            <div style="color:#aaa; font-size:11px; margin-top:5px;">▼ 注視点 (Target Pos)</div>
+                            <div class="bp-logic-row"><span class="bp-logic-key">X, Y, Z:</span><span class="bp-val">${s2.tx.toFixed(2)}, ${s2.ty.toFixed(2)}, ${s2.tz.toFixed(2)}</span></div>
+                        </div>
+                    </div>`;
+                } else {
+                    logicHtml = `
+                    <div class="bp-body">
+                        <div class="bp-section-title">1. 時間の計算 (Calc Relative Time)</div>
+                        <div class="bp-logic-row">
+                            <span class="bp-logic-key">入力 (Input):</span>
+                            <span>Global Time - <span class="bp-val">${startTime.toFixed(2)}</span> = <span class="bp-val" style="color:#4d94ff">Relative Time</span></span>
+                        </div>
+                        <div class="bp-note">※ マーカー表示とスポイトで「このシーンの時間」を作ってください。</div>
+
+                        <div class="bp-section-title" style="margin-top:15px;">2. マッピング設定 (Mapping Nodon)</div>
+                        <div style="margin-bottom:10px;">
+                            <div style="color:#aaa; font-size:11px; margin-bottom:2px;">▼ カメラ位置 (Camera Pos)</div>
+                            <div class="bp-logic-row"><span class="bp-logic-key">Input Range:</span><span class="bp-val">0.00</span> ～ <span class="bp-val">${dur.toFixed(2)}</span> <span style="font-size:10px; color:#666;">(Duration)</span></div>
+                            <div class="bp-logic-row"><span class="bp-logic-key">Output X:</span><span class="bp-val">${s1.cx.toFixed(2)}</span> ～ <span class="bp-val">${s2.cx.toFixed(2)}</span></div>
+                            <div class="bp-logic-row"><span class="bp-logic-key">Output Y:</span><span class="bp-val">${s1.cy.toFixed(2)}</span> ～ <span class="bp-val">${s2.cy.toFixed(2)}</span></div>
+                            <div class="bp-logic-row"><span class="bp-logic-key">Output Z:</span><span class="bp-val">${s1.cz.toFixed(2)}</span> ～ <span class="bp-val">${s2.cz.toFixed(2)}</span></div>
+                        </div>
+                        <div>
+                            <div style="color:#aaa; font-size:11px; margin-bottom:2px;">▼ 注視点 (Target Pos)</div>
+                            <div class="bp-logic-row"><span class="bp-logic-key">Input Range:</span><span class="bp-val">0.00</span> ～ <span class="bp-val">${dur.toFixed(2)}</span></div>
+                            <div class="bp-logic-row"><span class="bp-logic-key">Output X:</span><span class="bp-val">${s1.tx.toFixed(2)}</span> ～ <span class="bp-val">${s2.tx.toFixed(2)}</span></div>
+                            <div class="bp-logic-row"><span class="bp-logic-key">Output Y:</span><span class="bp-val">${s1.ty.toFixed(2)}</span> ～ <span class="bp-val">${s2.ty.toFixed(2)}</span></div>
+                            <div class="bp-logic-row"><span class="bp-logic-key">Output Z:</span><span class="bp-val">${s1.tz.toFixed(2)}</span> ～ <span class="bp-val">${s2.tz.toFixed(2)}</span></div>
+                        </div>
+                        
+                        ${s2.easing !== 'linear' ? `
+                        <div class="bp-warn">
+                            ⚠️ 注意: <strong>${s2.easing.toUpperCase()}</strong> (イージング) が選択されています。<br>
+                            マッピングの入力に時間を入れる前に、0～1に正規化して関数を通すなどの工夫が必要です。<br>
+                            単純なマッピングだけだと <strong>Linear (直線移動)</strong> になります。
+                        </div>` : ''}
+                    </div>`;
+                }
+
+                div.innerHTML = `
+                    <div class="bp-title">
+                        <span>Transition: Scene ${i+1} → ${i+2}</span>
+                        <span style="font-size:12px; color:#aaa;">Global: ${startTime.toFixed(2)}s ～ ${endTime.toFixed(2)}s</span>
+                    </div>
+                    ${logicHtml}
+                `;
+                bpContent.appendChild(div);
+            }
+
+            bpModal.style.display = 'flex';
+        };
+    }
+
+    window.addEventListener('resize', () => {
+        const mw = canvasMain.parentElement.clientWidth; const mh = canvasMain.parentElement.clientHeight;
+        rendererMain.setSize(mw, mh); godCamera.aspect = mw / mh; godCamera.updateProjectionMatrix();
+        const isMobile = window.innerWidth < 768;
+        const pw = isMobile ? 160 : 320; const ph = isMobile ? 90 : 180;
+        rendererPreview.setSize(pw, ph); 
+        gameCamera.aspect = 16 / 9; gameCamera.updateProjectionMatrix();
+        visualCamera.aspect = 16 / 9; visualCamera.updateProjectionMatrix();
+        if (isMobile) transformControl.setSize(2.0); else transformControl.setSize(1.0);
+    });
+
+    slider.addEventListener('input', () => { selectItem(null, -1); updateCameraPos(); });
+    fovInput.addEventListener('input', updateCameraPos);
+    fovRadios.forEach(r => r.addEventListener('change', updateCameraPos));
+    
+    // Init
+    slider.max = calcTotalDuration();
+    rebuild3DObjects(); renderSceneUI(); renderObjectUI(); updateWorldStyle(); updateLightPos(); updateCameraPos(); animate();
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+</script>
+</body>
+</html>
