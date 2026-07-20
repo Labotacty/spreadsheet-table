@@ -1,0 +1,1964 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10141b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Bob字幕編集">
+  <link rel="manifest" href="BobVideoEditor.webmanifest">
+  <title>ボブ解説エディタ 試作</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #10141b;
+      --panel: #19212c;
+      --panel2: #222d3b;
+      --text: #edf3fa;
+      --muted: #9eb0c3;
+      --accent: #66d9ef;
+      --accent2: #89e66f;
+      --danger: #ff8090;
+      --border: #344559;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Noto Sans JP", sans-serif;
+    }
+    button, input, textarea, select { font: inherit; }
+    button {
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: #263446;
+      color: var(--text);
+      padding: 7px 11px;
+      cursor: pointer;
+    }
+    button:hover { border-color: var(--accent); background: #2d4157; }
+    button.primary { background: #1e6475; border-color: #63cde1; }
+    button.danger { color: #ffb5bd; }
+    input, textarea, select {
+      color: var(--text);
+      background: #111923;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 7px 8px;
+    }
+    textarea { resize: vertical; }
+    .app-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: #151d27;
+    }
+    h1 { font-size: 17px; margin: 0 12px 0 0; }
+    .header-actions { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+    .file-label { display: inline-flex; align-items: center; gap: 7px; }
+    .file-label input { width: 180px; padding: 4px; }
+    .status { color: var(--muted); font-size: 12px; margin-left: auto; }
+    #exportProgress { width: 150px; height: 12px; accent-color: var(--accent2); }
+    .export-status { color: var(--accent2); font-size: 12px; font-variant-numeric: tabular-nums; }
+    main {
+      display: grid;
+      grid-template-columns: minmax(280px, 0.8fr) minmax(440px, 1.2fr);
+      gap: 12px;
+      padding: 12px;
+      min-height: calc(100vh - 60px);
+    }
+    .panel {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel);
+      padding: 12px;
+      min-width: 0;
+    }
+    .panel h2 { font-size: 14px; margin: 0 0 9px; }
+    .panel h3 { font-size: 12px; color: var(--muted); margin: 17px 0 7px; }
+    .hint { color: var(--muted); font-size: 12px; line-height: 1.55; }
+    #scriptInput { width: 100%; min-height: 210px; line-height: 1.55; }
+    .row { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+    .row + .row { margin-top: 8px; }
+    .grow { flex: 1 1 auto; }
+    .number-stepper { display: flex; align-items: stretch; width: 100%; min-width: 0; }
+    .number-stepper > input { flex: 1 1 auto; width: auto !important; min-width: 0; border-radius: 6px 0 0 6px; }
+    .number-stepper-buttons { display: flex; flex-direction: column; width: 30px; flex: 0 0 30px; }
+    .number-stepper-buttons button { min-height: 0; height: 50%; padding: 0; border-radius: 0; font-size: 10px; line-height: 1; }
+    .number-stepper-buttons button:first-child { border-radius: 0 6px 0 0; }
+    .number-stepper-buttons button:last-child { border-top-width: 0; border-radius: 0 0 6px 0; }
+    .timeline-actions { display: inline-flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+    .timeline-actions button { min-height: 28px; padding: 3px 7px; font-size: 11px; }
+    .timeline-zoom-label { min-width: 38px; color: var(--accent); text-align: center; font-variant-numeric: tabular-nums; }
+    .timeline-cut-button.pending { color: #ffd4d9; border-color: var(--danger); background: #66333d; }
+    .caption-card.jump-target { animation: captionJumpHighlight 1.2s ease-out; }
+    @keyframes captionJumpHighlight {
+      0%, 100% { box-shadow: 0 0 0 1px rgba(137,230,111,.25); }
+      25% { box-shadow: 0 0 0 3px rgba(102,217,239,.8), 0 0 18px rgba(102,217,239,.35); }
+    }
+    .preview-wrap { display: flex; flex-direction: column; gap: 9px; }
+    .preview-sticky { display: flex; flex-direction: column; gap: 9px; }
+    .caption-editor-column { min-width: 0; }
+    .video-stage {
+      position: sticky;
+      top: 12px;
+      z-index: 5;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      min-height: 0;
+      overflow: hidden;
+      background: #05070a;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      --stage-scale: 1;
+    }
+    #video { display: block; width: 100%; height: 100%; background: #05070a; object-fit: cover; }
+    .overlay { position: absolute; inset: 0; pointer-events: none; display: none; }
+    .bob {
+      position: absolute;
+      left: calc(var(--bob-x, 50) * 1%);
+      bottom: calc(var(--bob-y, 4) * 1%);
+      width: var(--bob-width, 20px);
+      min-width: max(4px, calc(6px * var(--stage-scale, 1)));
+      aspect-ratio: 1;
+      height: auto;
+      text-align: center;
+      transform: translateX(-50%);
+      transform-origin: center bottom;
+      pointer-events: auto;
+      cursor: grab;
+      touch-action: none;
+    }
+    .bob.dragging { cursor: grabbing; }
+    @keyframes bobBounce {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      22% { transform: translateX(-50%) translateY(-35%); }
+      44% { transform: translateX(-50%) translateY(0); }
+      62% { transform: translateX(-50%) translateY(-18%); }
+      78% { transform: translateX(-50%) translateY(0); }
+    }
+    @keyframes bobThink {
+      0%, 100% { transform: translateX(-50%) translateX(-14%) rotate(-4deg); }
+      50% { transform: translateX(-50%) translateX(14%) rotate(4deg); }
+    }
+    @keyframes bobBounceStrong {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      20% { transform: translateX(-50%) translateY(-65%); }
+      40% { transform: translateX(-50%) translateY(0); }
+      58% { transform: translateX(-50%) translateY(-38%); }
+      76% { transform: translateX(-50%) translateY(0); }
+    }
+    @keyframes bobThinkStrong {
+      0%, 100% { transform: translateX(-50%) translateX(-30%) rotate(-8deg); }
+      50% { transform: translateX(-50%) translateX(30%) rotate(8deg); }
+    }
+    .bob-motion-bounce { animation: bobBounce .8s ease-in-out infinite; }
+    .bob-motion-think { animation: bobThink 1.2s ease-in-out infinite; }
+    .bob-motion-bounceStrong { animation: bobBounceStrong .58s ease-in-out infinite; }
+    .bob-motion-thinkStrong { animation: bobThinkStrong .82s ease-in-out infinite; }
+    .bob img { display: block; width: 100%; height: 100%; max-width: 100%; object-fit: contain; object-position: center bottom; }
+    .bob-placeholder {
+      position: relative;
+      width: 100%;
+      aspect-ratio: auto;
+      height: 100%;
+      margin: 0 auto;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(circle at 50% 46%,
+        #0509a8 0 34%,
+        rgba(20, 32, 188, .98) 48%,
+        rgba(38, 166, 235, .72) 62%,
+        rgba(89, 231, 255, .34) 75%,
+        rgba(164, 251, 255, 0) 100%);
+      filter: drop-shadow(0 0 max(1px, calc(4px * var(--stage-scale, 1))) rgba(91, 235, 255, .68));
+      color: transparent;
+    }
+    .bob-placeholder::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: -20%;
+      width: 24%;
+      height: 24%;
+      transform: translateX(-50%);
+      background: linear-gradient(to bottom, rgba(53, 219, 229, .82), rgba(53, 219, 229, 0));
+      clip-path: polygon(0 0, 100% 0, 50% 100%);
+      filter: drop-shadow(0 calc(2px * var(--stage-scale, 1)) max(1px, calc(1px * var(--stage-scale, 1))) rgba(0,0,0,.25));
+    }
+    img[hidden], .bob-placeholder[hidden] { display: none !important; }
+    .bubble {
+      position: absolute;
+      left: calc(var(--bubble-x, 2) * 1%);
+      bottom: calc(var(--bubble-y, 38) * 1%);
+      width: var(--bubble-width, 84%);
+      min-width: 0;
+      padding: max(4px, calc(14px * var(--stage-scale, 1))) max(6px, calc(18px * var(--stage-scale, 1)));
+      color: #1c2530;
+      background: #fff;
+      border: max(1px, calc(3px * var(--stage-scale, 1))) solid #1c2530;
+      border-radius: max(8px, calc(15px * var(--stage-scale, 1)));
+      box-shadow: calc(3px * var(--stage-scale, 1)) calc(3px * var(--stage-scale, 1)) 0 rgba(0,0,0,.35);
+      font-weight: 700;
+      font-size: var(--bubble-font-size, 30px);
+      line-height: 1.35;
+      white-space: pre-line;
+      overflow-wrap: anywhere;
+      pointer-events: auto;
+      cursor: grab;
+      touch-action: none;
+    }
+    .bubble.dragging { cursor: grabbing; }
+    .bubble .red { color: #e43b2d; }
+    .bubble::before,
+    .bubble::after {
+      content: "";
+      position: absolute;
+      left: 82%;
+      width: 0;
+      height: 0;
+      transform: translateX(-50%);
+      z-index: 0;
+    }
+    .bubble::before {
+      bottom: calc(-24px * var(--stage-scale, 1));
+      border-left: max(4px, calc(14px * var(--stage-scale, 1))) solid transparent;
+      border-right: max(4px, calc(14px * var(--stage-scale, 1))) solid transparent;
+      border-top: max(7px, calc(24px * var(--stage-scale, 1))) solid #1c2530;
+    }
+    .bubble::after {
+      bottom: calc(-19px * var(--stage-scale, 1));
+      border-left: max(3px, calc(10px * var(--stage-scale, 1))) solid transparent;
+      border-right: max(3px, calc(10px * var(--stage-scale, 1))) solid transparent;
+      border-top: max(6px, calc(20px * var(--stage-scale, 1))) solid #fff;
+      z-index: 1;
+    }
+    .transport { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+    .time { font-variant-numeric: tabular-nums; color: var(--accent); min-width: 110px; }
+    .caption-list { display: flex; flex-direction: column; gap: 8px; max-height: 54vh; overflow: auto; padding-right: 2px; }
+    .caption-timeline {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #111923;
+      padding: 7px;
+      margin-bottom: 9px;
+      overflow: visible;
+    }
+    .timeline-toolbar { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 11px; margin-bottom: 5px; }
+    .timeline-viewport { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; touch-action: none; cursor: grab; }
+    .timeline-viewport.dragging { cursor: grabbing; user-select: none; }
+    .timeline-scale { display: flex; justify-content: space-between; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; margin-bottom: 3px; }
+    .timeline-track {
+      position: relative;
+      height: 62px;
+      overflow: hidden;
+      border: 1px solid #40546b;
+      border-radius: 5px;
+      background-color: #0d141d;
+      background-image: repeating-linear-gradient(to right, transparent 0, transparent calc(10% - 1px), rgba(158,176,195,.14) calc(10% - 1px), rgba(158,176,195,.14) 10%);
+      cursor: crosshair;
+      touch-action: none;
+    }
+    .timeline-caption {
+      position: absolute;
+      top: 10px;
+      height: 40px;
+      min-width: 12px;
+      overflow: visible;
+      z-index: 2;
+      border: 1px solid #63cde1;
+      border-radius: 5px;
+      background: linear-gradient(180deg, #276b7d, #1d4f65);
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+    }
+    .timeline-caption:hover { background: linear-gradient(180deg, #378ba0, #24647d); }
+    .timeline-caption.active { border-color: var(--accent2); box-shadow: 0 0 0 1px rgba(137,230,111,.45); }
+    .timeline-caption.dragging { cursor: grabbing; background: #2e7f58; }
+    .timeline-caption-label { display: block; overflow: hidden; padding: 3px 8px; color: #f4fbff; font-size: 10px; line-height: 1.25; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; }
+    .timeline-caption-time { display: block; padding: 0 8px; color: #c8eaf0; font-size: 9px; line-height: 1.1; font-variant-numeric: tabular-nums; pointer-events: none; }
+    .timeline-caption-handle { position: absolute; top: -1px; bottom: -1px; width: 8px; border: 1px solid rgba(255,255,255,.7); background: rgba(255,255,255,.18); cursor: ew-resize; touch-action: none; }
+    .timeline-caption-handle.start { left: -1px; border-radius: 5px 0 0 5px; }
+    .timeline-caption-handle.end { right: -1px; border-radius: 0 5px 5px 0; }
+    .timeline-cut {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      z-index: 1;
+      border-left: 1px solid rgba(255,128,144,.8);
+      border-right: 1px solid rgba(255,128,144,.8);
+      background: repeating-linear-gradient(135deg, rgba(255,128,144,.28) 0 5px, rgba(255,128,144,.08) 5px 10px);
+      pointer-events: none;
+    }
+    .timeline-cut-label { display: block; padding: 3px 5px; color: #ffc1ca; font-size: 9px; white-space: nowrap; pointer-events: none; }
+    .timeline-playhead { position: absolute; top: 0; bottom: 0; left: 0; z-index: 4; width: 2px; background: #ff8090; pointer-events: none; box-shadow: 0 0 3px rgba(255,128,144,.8); }
+    .timeline-playhead::before { content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%); border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 7px solid #ff8090; }
+    .caption-card {
+      display: grid;
+      grid-template-columns: 28px minmax(120px, 1fr) auto;
+      gap: 7px;
+      align-items: start;
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+    }
+    .caption-card.active { border-color: var(--accent2); box-shadow: 0 0 0 1px rgba(137,230,111,.25); }
+    .caption-number { color: var(--accent); font-weight: 800; padding-top: 7px; }
+    .caption-text { width: 100%; min-height: 56px; line-height: 1.45; }
+    .caption-meta { grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+    .caption-meta input { width: 82px; font-variant-numeric: tabular-nums; }
+    .caption-meta .number-stepper { width: 82px; flex: 0 0 82px; }
+    .caption-meta button { padding: 5px 8px; font-size: 12px; }
+    .caption-style { grid-column: 2 / -1; border-top: 1px solid var(--border); padding-top: 6px; }
+    .caption-style summary { cursor: pointer; color: var(--accent); font-size: 12px; }
+    .caption-style-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; margin-top: 7px; }
+    .caption-style-grid label { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: 11px; }
+    .caption-style-grid input { width: 100%; padding: 5px 6px; }
+    .caption-style-grid select { width: 100%; padding: 5px 6px; }
+    .caption-style-enabled { color: var(--text); font-size: 12px; display: inline-flex; gap: 5px; align-items: center; margin-top: 7px; }
+    .cut-list { display: flex; flex-direction: column; gap: 5px; margin-top: 7px; }
+    .cut-card { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel2); font-size: 12px; }
+    .cut-card input { width: 78px; padding: 5px 6px; font-variant-numeric: tabular-nums; }
+    .cut-card .number-stepper { width: 78px; flex: 0 0 78px; }
+    .cut-card button { padding: 5px 8px; font-size: 12px; }
+    .settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+    .settings label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
+    .settings input { width: 100%; }
+    .export-note { padding: 8px; border: 1px solid #52677e; border-radius: 7px; background: #152332; }
+    .empty { color: var(--muted); text-align: center; padding: 20px 8px; border: 1px dashed var(--border); border-radius: 8px; }
+    .export-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 18px; background: rgba(5, 8, 13, .72); backdrop-filter: blur(4px); }
+    #exportOverlay[hidden] { display: none !important; }
+    .export-dialog { width: min(480px, calc(100vw - 32px)); padding: 18px; border: 1px solid #5f7892; border-radius: 12px; background: #192633; box-shadow: 0 12px 40px rgba(0,0,0,.45); }
+    .export-dialog h2 { margin: 0 0 8px; font-size: 16px; }
+    .export-dialog p { margin: 8px 0 0; }
+    .export-dialog progress { display: block; width: 100%; height: 17px; accent-color: var(--accent2); }
+    .export-progress-row { display: flex; align-items: center; gap: 10px; }
+    .export-progress-percent { min-width: 48px; color: var(--accent2); font-variant-numeric: tabular-nums; text-align: right; }
+    .export-dialog .hint { margin-top: 10px; }
+    .export-overlay-close { display: block; width: 100%; margin-top: 14px; }
+    .mobile-nav,
+    .mobile-install-note,
+    .desktop-only { display: none; }
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+      .caption-list { max-height: none; }
+    }
+    @media (min-width: 901px) {
+      .desktop-only { display: inline-flex; }
+      main { grid-template-columns: 1fr; }
+      #scriptPanel { display: none; }
+      body.desktop-setup-open main { grid-template-columns: minmax(260px, .42fr) minmax(560px, 1.58fr); }
+      body.desktop-setup-open #scriptPanel { display: block; }
+      .preview-wrap { max-width: 960px; margin-left: auto; margin-right: auto; }
+      body.desktop-setup-open .preview-wrap { max-width: none; }
+      body:not(.desktop-setup-open) .preview-wrap {
+        display: grid;
+        grid-template-columns: minmax(420px, 1.45fr) minmax(300px, .75fr);
+        align-items: start;
+        gap: 12px;
+        max-width: 1680px;
+      }
+      body:not(.desktop-setup-open) .preview-sticky {
+        grid-column: 1;
+        grid-row: 1;
+        min-width: 0;
+        align-self: start;
+      }
+      body:not(.desktop-setup-open) .caption-editor-column {
+        grid-column: 2;
+        grid-row: 1;
+        min-width: 0;
+        max-height: calc(100vh - 24px);
+        overflow-y: auto;
+        padding-right: 4px;
+        align-self: start;
+        scrollbar-gutter: stable;
+      }
+      body:not(.desktop-setup-open) .caption-editor-column .caption-list {
+        max-height: none;
+        overflow: visible;
+      }
+      .preview-sticky { position: sticky; top: 12px; z-index: 8; padding-bottom: 9px; background: var(--panel); }
+      .preview-sticky .video-stage { position: relative; top: auto; z-index: auto; }
+    }
+    @media (max-width: 600px) {
+      html { scroll-behavior: smooth; }
+      body {
+        min-width: 320px;
+        padding-bottom: env(safe-area-inset-bottom);
+        overflow-x: hidden;
+      }
+      .app-header {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        gap: 6px;
+        padding: 8px max(9px, env(safe-area-inset-left)) 7px;
+      }
+      h1 { flex: 1 0 100%; font-size: 15px; margin: 0; }
+      .header-actions {
+        width: 100%;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        padding-bottom: 2px;
+        scrollbar-width: none;
+      }
+      .header-actions::-webkit-scrollbar { display: none; }
+      .header-actions button,
+      .header-actions .file-label { flex: 0 0 auto; min-height: 42px; }
+      .file-label { gap: 5px; }
+      .file-label input { width: 116px; max-width: 38vw; }
+      .status {
+        order: 4;
+        width: 100%;
+        margin-left: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #exportProgress { width: 96px; }
+      .mobile-nav {
+        position: sticky;
+        top: 93px;
+        z-index: 19;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 4px;
+        padding: 6px 8px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(16, 20, 27, .96);
+        backdrop-filter: blur(8px);
+      }
+      .mobile-nav button {
+        min-height: 40px;
+        padding: 6px 4px;
+        color: var(--muted);
+        background: #1b2633;
+        font-size: 12px;
+      }
+      .mobile-nav button.active {
+        color: var(--text);
+        border-color: var(--accent);
+        background: #1f5161;
+      }
+      .mobile-install-note {
+        display: block;
+        margin: 6px 8px 0;
+        color: var(--muted);
+        font-size: 11px;
+        text-align: center;
+      }
+      main {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 8px;
+        min-height: auto;
+      }
+      .panel {
+        scroll-margin-top: 145px;
+        padding: 10px;
+        border-radius: 8px;
+      }
+      .caption-timeline, .caption-list, #video-stage { scroll-margin-top: 145px; }
+      .panel h2 { font-size: 15px; }
+      .panel h3 { margin-top: 14px; }
+      .hint { font-size: 11px; }
+      button { min-height: 42px; padding: 9px 10px; }
+      input, textarea, select { min-height: 42px; font-size: 16px; }
+      #scriptInput { min-height: 180px; }
+      .row > button { flex: 1 1 auto; }
+      .number-stepper-buttons { width: 36px; flex-basis: 36px; }
+      .number-stepper-buttons button { font-size: 11px; }
+      .settings { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+      .settings label { font-size: 11px; }
+      .preview-wrap {
+        position: sticky;
+        top: 137px;
+        z-index: 7;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        height: calc(100vh - 145px);
+        height: calc(100dvh - 145px);
+        min-height: 0;
+        overflow: hidden;
+      }
+      .preview-sticky {
+        position: relative;
+        top: auto;
+        z-index: auto;
+        min-height: 0;
+        gap: 5px;
+        padding-bottom: 8px;
+        background: var(--panel);
+      }
+      .preview-sticky .video-stage {
+        position: relative;
+        top: auto;
+        z-index: auto;
+      }
+      .preview-sticky .transport button {
+        min-height: 34px;
+        padding: 6px 7px;
+        font-size: 12px;
+      }
+      .caption-editor-column {
+        min-height: 0;
+        max-height: none;
+        overflow-y: auto;
+        padding-right: 2px;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+      }
+      .caption-editor-column .caption-list {
+        max-height: none;
+        overflow: visible;
+      }
+      .video-stage {
+        position: sticky;
+        top: 137px;
+        z-index: 5;
+        border-radius: 6px;
+        box-shadow: 0 3px 12px rgba(0,0,0,.35);
+      }
+      .transport { gap: 5px; }
+      .transport button { flex: 1 1 auto; }
+      .time { min-width: 100%; order: 3; text-align: center; }
+      .timeline-viewport { min-width: 0; }
+      .timeline-actions button { min-height: 38px; }
+      .timeline-scale, .timeline-track { min-width: 520px; }
+      .timeline-track { height: 72px; }
+      .timeline-caption { height: 48px; top: 12px; }
+      .timeline-caption-handle { width: 14px; }
+      .caption-list { gap: 7px; }
+      .caption-card {
+        grid-template-columns: 26px minmax(0, 1fr) auto;
+        gap: 6px;
+        padding: 7px;
+      }
+      .caption-text { min-height: 84px; }
+      .caption-meta { gap: 5px; }
+      .caption-meta input { width: 76px; }
+      .caption-meta .number-stepper { width: 76px; flex-basis: 76px; }
+      .caption-meta button { flex: 1 1 auto; min-height: 40px; }
+      .caption-style-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .cut-card input { width: 74px; }
+      .cut-card .number-stepper { width: 74px; flex-basis: 74px; }
+      .export-note { line-height: 1.5; }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <h1>ボブ解説エディタ（試作）</h1>
+    <div class="header-actions">
+      <label class="file-label">動画 <input id="videoFile" type="file" accept="video/*"></label>
+      <label class="file-label">任意：ボブ画像 <input id="bobFile" type="file" accept="image/*"></label>
+      <label class="file-label">台本ファイル <input id="scriptFile" type="file" accept=".txt,.md,.srt,.json,application/json,text/plain"></label>
+      <button id="saveProject">プロジェクト保存</button>
+      <label class="file-label"><span>読込</span><input id="projectFile" type="file" accept=".json,application/json"></label>
+      <button id="renderVideo" class="primary">動画を書き出す（β）</button>
+      <button id="toggleSetupPanel" class="desktop-only" type="button">台本・設定</button>
+      <progress id="exportProgress" value="0" max="100" hidden></progress>
+      <span id="exportStatus" class="export-status" hidden></span>
+    </div>
+    <span id="status" class="status">台本を貼り付けるか、ファイルを読み込んでください</span>
+  </header>
+
+  <div id="exportOverlay" class="export-overlay" hidden aria-live="polite">
+    <div class="export-dialog" role="status" aria-label="動画の書き出し進捗">
+      <h2>動画を書き出しています</h2>
+      <div class="export-progress-row">
+        <progress id="exportOverlayProgress" value="0" max="100"></progress>
+        <span id="exportOverlayPercent" class="export-progress-percent">0%</span>
+      </div>
+      <p id="exportOverlayMessage">準備中…</p>
+      <p class="hint">書き出し中はSafariを閉じたり、別のアプリへ切り替えたりしないでください。</p>
+      <button id="exportOverlayClose" class="export-overlay-close" type="button" hidden>閉じる</button>
+    </div>
+  </div>
+
+  <nav class="mobile-nav" aria-label="モバイル移動">
+    <button type="button" class="active" data-mobile-target="video-stage">プレビュー</button>
+    <button type="button" data-mobile-target="captionTimeline">タイムライン</button>
+    <button type="button" data-mobile-target="captionList">字幕カード</button>
+    <button type="button" data-mobile-target="scriptPanel">台本・設定</button>
+  </nav>
+  <p class="mobile-install-note">Safariの共有メニューから「ホーム画面に追加」するとアプリのように使えます。</p>
+
+  <main>
+    <section id="scriptPanel" class="panel">
+      <h2>1. 台本を読み込む</h2>
+      <textarea id="scriptInput" placeholder="例：
+字幕: カウンターノードンを呼び出します
+字幕: カウント範囲を0から11に設定します
+
+または、字幕にしたい文章を空行で区切って貼り付けます。"></textarea>
+      <div class="row">
+        <button id="parseScript" class="primary">台本から字幕を作成</button>
+        <button id="sampleScript">サンプルを入れる</button>
+        <button id="clearCaptions" class="danger">字幕を全削除</button>
+      </div>
+      <p class="hint">「字幕:」で始まる行がある場合は、その行だけを字幕化します。SRTと簡単なJSON（captions配列）も読み込めます。時間が書かれていない文章は、文字数から仮の表示時間を自動計算します。</p>
+
+      <h3>字幕の自動配置</h3>
+      <div class="row">
+        <button id="fitToVideo">動画の長さに合わせる</button>
+        <button id="resetTimes">文字数から自動配置</button>
+        <label class="hint"><input id="keepGap" type="checkbox" checked> 字幕間に0.25秒の間隔</label>
+      </div>
+      <p class="hint">文字数・改行・句読点から読みやすい表示時間を計算します。録画に合わせて、下の開始・終了時刻は個別に調整できます。</p>
+
+      <h3>カット編集（削除区間）</h3>
+      <div class="row">
+        <button id="markCutStart">削除開始←現在位置</button>
+        <button id="markCutEnd">ここまでを削除</button>
+        <button id="clearCuts" class="danger">カット全解除</button>
+      </div>
+      <p id="cutStatus" class="hint">削除開始位置を設定してから、終了位置で「ここまでを削除」を押します。</p>
+      <div id="cutList" class="cut-list"><div class="empty">カット区間はありません</div></div>
+
+      <h3>ボブ字幕の見た目・位置</h3>
+      <div class="settings">
+        <label>吹き出し幅（%）<input id="bubbleWidth" type="number" min="5" max="95" value="32"></label>
+        <label>文字サイズ（%）<input id="bubbleFont" type="number" min="50" max="180" value="75"></label>
+        <label>ボブの横位置（左から%）<input id="bobX" type="number" min="0" max="100" step="0.1" value="28"></label>
+        <label>ボブの縦位置（下から%）<input id="bobY" type="number" min="0" max="100" step="0.1" value="67"></label>
+        <label>ボブの大きさ（%）<input id="bobSize" type="number" min="0.5" max="40" step="0.5" value="2"></label>
+        <label>吹き出しの横位置（左から%）<input id="bubbleX" type="number" min="0" max="100" step="0.1" value="2"></label>
+        <label>吹き出しの縦位置（下から%）<input id="bubbleY" type="number" min="0" max="100" step="0.1" value="80"></label>
+        <label>ボブの動き（共通）<select id="globalMotion"><option value="bounce" selected>ぴょんぴょん</option><option value="none">なし</option><option value="bounceStrong">ぴょんぴょん（強め・速め）</option><option value="think">考え中（左右）</option><option value="thinkStrong">考え中（大きめ・速め）</option></select></label>
+      </div>
+      <div class="row">
+        <label class="hint"><input id="showBuiltInBob" type="checkbox" checked> 自作ボブを表示</label>
+        <button id="resetPosition">位置を初期値に戻す</button>
+      </div>
+      <p class="hint">ここは全字幕の初期値です。字幕カードの「この字幕の見た目を個別設定」を有効にすると、その字幕だけ別の位置・大きさにできます。数値変更はプレビューへ即時反映されます。サイズは1280×720の動画画面を基準にしているため、モニターやiPhoneの表示幅が変わっても動画内の比率は変わりません。</p>
+      <p class="hint">ボブ画像を選ばない場合は何も表示しません。自作ボブを使う場合だけ「自作ボブを表示」をオンにしてください。</p>
+      <p class="hint">プレビューに表示中のボブまたは吹き出しは、ドラッグして位置を動かせます。個別設定を有効にした字幕はその字幕だけ、未設定なら共通設定が動きます。</p>
+      <p class="hint export-note">赤文字：<code>[[赤]]重要な部分[[/赤]]</code> または <code>【赤】重要な部分【/赤】</code>。改行は字幕本文にそのまま入力できます。JSONでは <code>\n</code> も使えます。</p>
+    </section>
+
+    <section class="panel preview-wrap">
+      <div class="preview-sticky">
+      <h2>2. プレビューと字幕調整</h2>
+      <div id="video-stage" class="video-stage">
+        <video id="video" controls playsinline></video>
+        <div id="overlay" class="overlay">
+          <div id="bubble" class="bubble"></div>
+          <div id="bob" class="bob">
+            <img id="bobImage" alt="ボブ" hidden>
+            <div id="bobPlaceholder" class="bob-placeholder" hidden>ボブ</div>
+          </div>
+        </div>
+      </div>
+      <div class="transport">
+        <button id="playPause">再生／停止</button>
+        <button id="stepBack">-1フレーム</button>
+        <button id="stepForward">+1フレーム</button>
+        <span id="timeDisplay" class="time">00:00.00 / --:--.--</span>
+        <span class="hint">選択中：</span><span id="selectedLabel" class="hint">なし</span>
+      </div>
+      <div class="transport">
+        <button id="markStart">現在位置を開始にする</button>
+        <button id="markEnd">現在位置を終了にする</button>
+        <button id="jumpSelected">選択字幕へ移動</button>
+      </div>
+      <h2>3. 字幕カード</h2>
+      <div id="captionTimeline" class="caption-timeline">
+        <div class="timeline-toolbar"><span>字幕タイムライン（斜線部分＝カット）</span><span class="timeline-actions"><button id="timelineZoomOut" type="button" title="タイムラインを縮小">−</button><span id="timelineZoomLabel" class="timeline-zoom-label">100%</span><button id="timelineZoomIn" type="button" title="タイムラインを拡大">＋</button><button id="timelineZoomReset" type="button" title="タイムラインの倍率をリセット">戻す</button><button id="timelineCutButton" class="timeline-cut-button" type="button" title="現在位置をカット開始・終了に設定">✂ カット開始</button><span id="timelineCurrent">00:00.00</span></span></div>
+        <div id="timelineViewport" class="timeline-viewport">
+          <div class="timeline-scale"><span>00:00.00</span><span id="timelineEnd">--:--.--</span></div>
+          <div id="timelineTrack" class="timeline-track"><div id="timelinePlayhead" class="timeline-playhead"></div></div>
+        </div>
+      </div>
+      </div>
+      <div class="caption-editor-column">
+      <p class="hint">字幕バーをドラッグすると表示位置を移動できます。左右の端をドラッグすると開始・終了位置を調整できます。字幕のない部分を左右にドラッグすると、拡大したタイムラインを横スクロールできます。空いている場所をタップすると、その時刻へ移動します。</p>
+      <p class="hint">Ctrl+Zで、直前の字幕・タイムライン・カット編集を元に戻せます。</p>
+      <div id="captionList" class="caption-list">
+        <div class="empty">まだ字幕がありません</div>
+      </div>
+      <p class="hint export-note">プレビューと書き出しは16:9です。素材が16:9でない場合は中央をクロップして黒い余白を避けます。ボブ・吹き出し・文字は1280×720基準でプレビューと書き出しを同じ比率にしています。書き出し中は上部に進捗を表示します。ブラウザがMP4録画に対応していない場合はWebMになります。</p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const state = {
+      captions: [],
+      cuts: [],
+      pendingCutStart: null,
+      pendingSeek: null,
+      skipGuard: false,
+      selected: -1,
+      bobDataUrl: "",
+      showBuiltInBob: true,
+      activeMotionKey: "",
+      drag: null,
+      timelineDrag: null,
+      timelinePan: null,
+      suppressTimelineClick: false,
+      timelineZoom: 1,
+      undoStack: [],
+      textUndoCaptured: false,
+      sourceVideoName: "",
+      captionsAutoTimed: false,
+      fps: 30
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const video = $("video");
+    const VIDEO_REFERENCE_WIDTH = 1280;
+    const VIDEO_REFERENCE_HEIGHT = 720;
+    const REFERENCE_BUBBLE_FONT_PX = 30;
+
+    function updatePreviewScale() {
+      const stage = $("video-stage");
+      if (!stage) return 1;
+      const width = stage.clientWidth || VIDEO_REFERENCE_WIDTH;
+      const scale = width / VIDEO_REFERENCE_WIDTH;
+      stage.style.setProperty("--stage-scale", scale);
+      return scale;
+    }
+
+    function setStatus(message) { $("status").textContent = message; }
+    function clamp(value, min, max) { return Math.min(max, Math.max(min, value)); }
+    function snapPercent(value) { return Math.round(value * 10) / 10; }
+    function formatTime(value) {
+      if (!Number.isFinite(value)) return "--:--.--";
+      const minutes = Math.floor(value / 60);
+      const seconds = value - minutes * 60;
+      return String(minutes).padStart(2, "0") + ":" + seconds.toFixed(2).padStart(5, "0");
+    }
+    function escapeHtml(value) {
+      return String(value || "").replace(/[&<>\"']/g, character => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"
+      }[character]));
+    }
+    function renderRichText(value) {
+      let html = escapeHtml(value);
+      html = html.replace(/\[\[赤\]\]([\s\S]*?)\[\[\/赤\]\]/g, '<span class="red">$1</span>');
+      html = html.replace(/【赤】([\s\S]*?)【\/赤】/g, '<span class="red">$1</span>');
+      return html.replace(/\n/g, "<br>");
+    }
+    function numberFromInput(id, fallback) {
+      const value = Number($(id).value);
+      return Number.isFinite(value) ? value : fallback;
+    }
+    function decorateNumberInput(input) {
+      if (!input || input.type !== "number" || input.dataset.stepperDecorated === "true") return input;
+      input.dataset.stepperDecorated = "true";
+      const wrapper = document.createElement("span");
+      wrapper.className = "number-stepper";
+      input.parentNode.insertBefore(wrapper, input);
+      wrapper.append(input);
+      const buttons = document.createElement("span");
+      buttons.className = "number-stepper-buttons";
+      const up = document.createElement("button");
+      up.type = "button";
+      up.textContent = "▲";
+      up.title = "値を増やす";
+      up.setAttribute("aria-label", "値を増やす");
+      const down = document.createElement("button");
+      down.type = "button";
+      down.textContent = "▼";
+      down.title = "値を減らす";
+      down.setAttribute("aria-label", "値を減らす");
+      buttons.append(up, down);
+      wrapper.append(buttons);
+      const step = delta => {
+        if (input.disabled) return;
+        try {
+          if (delta > 0) input.stepUp();
+          else input.stepDown();
+        } catch (_) {
+          const amount = Number(input.step) || 1;
+          const current = Number(input.value) || Number(input.min) || 0;
+          input.value = current + amount * delta;
+        }
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      };
+      up.addEventListener("click", event => { event.preventDefault(); event.stopPropagation(); step(1); });
+      down.addEventListener("click", event => { event.preventDefault(); event.stopPropagation(); step(-1); });
+      return input;
+    }
+    function normalizeMotion(value) {
+      return ["none", "bounce", "bounceStrong", "think", "thinkStrong"].includes(value) ? value : "none";
+    }
+    function visualSettings() {
+      return {
+        bubbleWidth: clamp(numberFromInput("bubbleWidth", 32), 5, 95),
+        bubbleFont: clamp(numberFromInput("bubbleFont", 75), 50, 180),
+        bobX: clamp(numberFromInput("bobX", 28), 0, 100),
+        bobY: clamp(numberFromInput("bobY", 67), 0, 100),
+        bobSize: clamp(numberFromInput("bobSize", 2), 0.5, 40),
+        bubbleX: clamp(numberFromInput("bubbleX", 2), 0, 100),
+        bubbleY: clamp(numberFromInput("bubbleY", 80), 0, 100),
+        motion: normalizeMotion($("globalMotion").value)
+      };
+    }
+    function applyVisualSettings(settings = {}) {
+      const defaults = { bubbleWidth: 32, bubbleFont: 75, bobX: 28, bobY: 67, bobSize: 2, bubbleX: 2, bubbleY: 80, motion: "bounce" };
+      const merged = { ...defaults, ...settings };
+      Object.entries(merged).forEach(([key, value]) => { if ($(key)) $(key).value = value; });
+      updateOverlay();
+    }
+    function effectiveVisualSettings(caption) {
+      return { ...visualSettings(), ...((caption && caption.visual) || {}) };
+    }
+    function updateBobVisibility() {
+      const hasImage = Boolean(state.bobDataUrl);
+      const showBuiltIn = !hasImage && state.showBuiltInBob;
+      $("bob").style.display = hasImage || showBuiltIn ? "block" : "none";
+      $("bobImage").hidden = !hasImage;
+      $("bobPlaceholder").hidden = hasImage || !showBuiltIn;
+    }
+    function estimateDuration(text) {
+      const clean = String(text)
+        .replace(/\[\[\/?赤\]\]/g, "")
+        .replace(/【\/?赤】/g, "");
+      const compact = clean.replace(/\s/g, "");
+      const chars = [...compact].length;
+      const pauses = [...compact].filter(character => /[、。！？!?：:]/.test(character)).length;
+      const lineBreaks = (clean.match(/\n/g) || []).length;
+      // Japanese on-screen captions are easier to read at roughly 7 characters/second.
+      const duration = 1.4 + chars * 0.14 + pauses * 0.12 + lineBreaks * 0.25;
+      return clamp(duration, 2.4, 12);
+    }
+
+    function parseSrt(raw) {
+      const blocks = raw.replace(/\r/g, "").trim().split(/\n\s*\n/);
+      const result = [];
+      for (const block of blocks) {
+        const lines = block.split("\n");
+        const timingIndex = lines.findIndex(line => line.includes("-->"));
+        if (timingIndex < 0) continue;
+        const match = lines[timingIndex].match(/(\d{1,2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*(\d{1,2}:\d{2}:\d{2}[,.]\d{3})/);
+        if (!match) continue;
+        const toSeconds = (v) => {
+          const p = v.replace(",", ".").split(":").map(Number);
+          return p[0] * 3600 + p[1] * 60 + p[2];
+        };
+        const text = lines.slice(timingIndex + 1).join("\n").trim();
+        if (text) result.push({ start: toSeconds(match[1]), end: toSeconds(match[2]), text, autoTiming: false });
+      }
+      return result;
+    }
+
+    function parseJson(raw) {
+      try {
+        const data = JSON.parse(raw);
+        const list = Array.isArray(data) ? data : data.captions;
+        if (!Array.isArray(list)) return [];
+        let autoCursor = 0;
+        const gap = $("keepGap") && $("keepGap").checked ? 0.25 : 0;
+        return list.map((item) => {
+          const text = String(item.text ?? item.caption ?? "").trim();
+          const hasStart = Number.isFinite(Number(item.start));
+          const hasEnd = Number.isFinite(Number(item.end));
+          const start = hasStart ? Math.max(0, Number(item.start)) : autoCursor;
+          const end = hasEnd ? Math.max(start + 0.1, Number(item.end)) : start + estimateDuration(text);
+          autoCursor = end + gap;
+          return { start, end, text, visual: item.visual && typeof item.visual === "object" ? { ...item.visual } : null, autoTiming: !hasStart && !hasEnd };
+        }).filter(item => item.text);
+      } catch (_) { return []; }
+    }
+
+    function parsePlainScript(raw) {
+      const lines = raw.replace(/\r/g, "").split("\n");
+      const labeled = [];
+      let current = null;
+      for (const line of lines) {
+        const label = line.match(/^\s*(字幕|テロップ)\s*[:：]?\s*(.*)$/);
+        if (label) {
+          if (current && current.trim()) labeled.push(current.trim());
+          current = label[2] || "";
+        } else if (current !== null) {
+          if (!line.trim()) {
+            if (current.trim()) labeled.push(current.trim());
+            current = null;
+          } else {
+            current += "\n" + line.trim();
+          }
+        }
+      }
+      if (current && current.trim()) labeled.push(current.trim());
+      const source = labeled.length ? labeled : raw
+        .split(/\n\s*\n/)
+        .map(block => block.replace(/^\s*(台本|解説|操作|活用例)\s*[:：]\s*/gm, "").trim())
+        .filter(Boolean);
+      const result = [];
+      let cursor = 0;
+      const gap = $("keepGap").checked ? 0.25 : 0;
+      for (const text of source) {
+        const normalizedText = text.replace(/\\n/g, "\n");
+        const duration = estimateDuration(normalizedText);
+        result.push({ start: cursor, end: cursor + duration, text: normalizedText, autoTiming: true });
+        cursor += duration + gap;
+      }
+      return result;
+    }
+
+    function parseScript(raw) {
+      const trimmed = raw.trim();
+      if (!trimmed) return [];
+      if (trimmed.includes("-->") && parseSrt(trimmed).length) return parseSrt(trimmed);
+      if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+        const json = parseJson(trimmed);
+        if (json.length) return json;
+      }
+      return parsePlainScript(trimmed);
+    }
+
+    function normalizeCaptions(list) {
+      let autoCursor = 0;
+      const gap = $("keepGap") && $("keepGap").checked ? 0.25 : 0;
+      return list.map((item, index) => {
+        const text = String(item.text || item.caption || "").trim();
+        const hasStart = Number.isFinite(Number(item.start));
+        const hasEnd = Number.isFinite(Number(item.end));
+        const start = hasStart ? Math.max(0, Number(item.start)) : autoCursor;
+        const end = hasEnd ? Math.max(start + 0.1, Number(item.end)) : start + estimateDuration(text);
+        autoCursor = end + gap;
+        return { id: item.id || `${Date.now()}-${index}`, start, end, text, visual: item.visual && typeof item.visual === "object" ? { ...item.visual } : null, autoTiming: item.autoTiming === true };
+      }).filter(item => item.text);
+    }
+
+    function normalizeCuts(list) {
+      const sorted = (Array.isArray(list) ? list : []).map(item => {
+        const start = Math.max(0, Number(item.start) || 0);
+        const end = Math.max(start, Number(item.end) || start);
+        return { start, end };
+      }).filter(item => item.end - item.start > 0.05).sort((a, b) => a.start - b.start);
+      const merged = [];
+      for (const item of sorted) {
+        const previous = merged[merged.length - 1];
+        if (previous && item.start <= previous.end + 0.01) previous.end = Math.max(previous.end, item.end);
+        else merged.push({ ...item });
+      }
+      return merged;
+    }
+    function cutAt(time) { return state.cuts.find(cut => time >= cut.start && time < cut.end); }
+    function nextKeptTime(time) {
+      let next = Math.max(0, time);
+      let found;
+      do { found = cutAt(next); if (found) next = found.end + 0.001; } while (found);
+      return next;
+    }
+    function seekVideo(time) {
+      const target = Math.max(0, Number(time) || 0);
+      if (!video.src) {
+        setStatus("先に動画を読み込んでください");
+        return;
+      }
+      if (video.readyState < 1 || !Number.isFinite(video.duration)) {
+        state.pendingSeek = target;
+        setStatus("動画の読み込み完了を待っています");
+        return;
+      }
+      state.pendingSeek = null;
+      const next = nextKeptTime(Math.min(target, video.duration));
+      video.pause();
+      video.currentTime = Math.min(next, video.duration);
+      updateOverlay();
+      setStatus(`字幕位置へ移動：${formatTime(video.currentTime)}`);
+    }
+    function removedBefore(time) {
+      return state.cuts.reduce((total, cut) => total + (time <= cut.start ? 0 : Math.min(time, cut.end) - cut.start), 0);
+    }
+    function sourceToOutput(time) { return Math.max(0, time - removedBefore(time)); }
+    function editedDuration() {
+      if (!Number.isFinite(video.duration)) return 0;
+      return Math.max(0, video.duration - state.cuts.reduce((total, cut) => total + (cut.end - cut.start), 0));
+    }
+    function makeUndoSnapshot() {
+      return {
+        captions: state.captions.map(caption => ({ ...caption, visual: caption.visual ? { ...caption.visual } : null })),
+        cuts: state.cuts.map(cut => ({ ...cut })),
+        selected: state.selected,
+        visual: visualSettings(),
+        showBuiltInBob: state.showBuiltInBob
+      };
+    }
+    function pushUndo(label) {
+      state.undoStack.push({ label, snapshot: makeUndoSnapshot() });
+      if (state.undoStack.length > 50) state.undoStack.shift();
+    }
+    function undoLast() {
+      const entry = state.undoStack.pop();
+      if (!entry) { setStatus("戻せる操作がありません"); return; }
+      const snapshot = entry.snapshot;
+      state.textUndoCaptured = false;
+      state.captions = snapshot.captions.map(caption => ({ ...caption, visual: caption.visual ? { ...caption.visual } : null }));
+      state.cuts = snapshot.cuts.map(cut => ({ ...cut }));
+      state.selected = state.captions.length ? clamp(snapshot.selected, 0, state.captions.length - 1) : -1;
+      state.showBuiltInBob = Boolean(snapshot.showBuiltInBob);
+      $("showBuiltInBob").checked = state.showBuiltInBob;
+      applyVisualSettings(snapshot.visual || {});
+      renderCuts();
+      renderCaptions();
+      setStatus(`「${entry.label}」を元に戻しました`);
+    }
+    function renderCuts() {
+      const list = $("cutList"); list.innerHTML = "";
+      updateTimelineCutButton();
+      if (!state.cuts.length) { list.innerHTML = '<div class="empty">カット区間はありません</div>'; renderTimeline(); return; }
+      state.cuts.forEach((cut, index) => {
+        const card = document.createElement("div"); card.className = "cut-card";
+        const start = document.createElement("input"); start.type = "number"; start.step = "0.01"; start.min = "0"; start.value = cut.start.toFixed(2);
+        const end = document.createElement("input"); end.type = "number"; end.step = "0.01"; end.min = "0"; end.value = cut.end.toFixed(2);
+        const remove = document.createElement("button"); remove.className = "danger"; remove.textContent = "削除";
+        const update = () => { pushUndo("カット位置の編集"); state.cuts = normalizeCuts(state.cuts.map((item, itemIndex) => itemIndex === index ? { start: Number(start.value), end: Number(end.value) } : item)); renderCuts(); updateOverlay(); };
+        start.addEventListener("change", update); end.addEventListener("change", update);
+        remove.addEventListener("click", event => { event.stopPropagation(); pushUndo("カット区間の削除"); state.cuts.splice(index, 1); renderCuts(); updateOverlay(); });
+        card.append(`カット${String(index + 1).padStart(2, "0")}`, "開始", start, "終了", end, remove); list.append(card);
+        decorateNumberInput(start); decorateNumberInput(end);
+      });
+      renderTimeline();
+    }
+    function updateTimelineCutButton() {
+      const button = $("timelineCutButton");
+      if (!button) return;
+      const pending = state.pendingCutStart !== null;
+      button.classList.toggle("pending", pending);
+      button.textContent = pending ? "✂ カット終了" : "✂ カット開始";
+      button.setAttribute("aria-pressed", pending ? "true" : "false");
+    }
+    function updateCutStatus(message) {
+      $("cutStatus").textContent = message;
+      updateTimelineCutButton();
+    }
+    function markTimelineCut() {
+      const current = Math.max(0, video.currentTime || 0);
+      if (state.pendingCutStart === null) {
+        state.pendingCutStart = current;
+        updateCutStatus(`カット開始を${formatTime(current)}に設定しました。もう一度押すと、ここまでを削除します。`);
+        setStatus("タイムラインのカット開始位置を設定しました");
+        return;
+      }
+      const start = Math.min(state.pendingCutStart, current);
+      const finish = Math.max(state.pendingCutStart, current);
+      if (finish - start < 0.05) {
+        updateCutStatus("カット区間が短すぎます。少し離れた位置で、もう一度押してください。");
+        return;
+      }
+      pushUndo("カット区間の追加");
+      state.cuts = normalizeCuts([...state.cuts, { start, end: finish }]);
+      state.pendingCutStart = null;
+      renderCuts();
+      updateOverlay();
+      updateCutStatus(`カットを追加しました。編集後の長さ：約${formatTime(editedDuration())}`);
+    }
+    function skipCutDuringPlayback() {
+      if (video.paused || state.skipGuard) return;
+      const cut = cutAt(video.currentTime);
+      if (!cut) return;
+      state.skipGuard = true;
+      video.currentTime = Math.min(video.duration || cut.end, cut.end + 0.001);
+      setTimeout(() => { state.skipGuard = false; }, 0);
+    }
+
+    function timelineDuration() {
+      if (Number.isFinite(video.duration) && video.duration > 0) return video.duration;
+      return Math.max(1, ...state.captions.map(caption => Number(caption.end) || 0));
+    }
+    function applyTimelineZoom() {
+      const track = $("timelineTrack");
+      const scale = document.querySelector(".timeline-scale");
+      const label = $("timelineZoomLabel");
+      if (!track) return;
+      const width = Math.max(100, state.timelineZoom * 100);
+      track.style.width = `${width}%`;
+      if (scale) scale.style.width = `${width}%`;
+      if (label) label.textContent = `${Math.round(state.timelineZoom * 100)}%`;
+    }
+    function setTimelineZoom(next) {
+      state.timelineZoom = clamp(Number(next) || 1, 0.5, 8);
+      applyTimelineZoom();
+      updateTimelinePlayhead();
+    }
+    function updateTimelinePlayhead() {
+      const track = $("timelineTrack");
+      if (!track) return;
+      const duration = timelineDuration();
+      const current = Number(video.currentTime) || 0;
+      const playhead = $("timelinePlayhead");
+      if (playhead) playhead.style.left = `${clamp(current / duration * 100, 0, 100)}%`;
+      const currentLabel = $("timelineCurrent");
+      if (currentLabel) currentLabel.textContent = formatTime(current);
+      const endLabel = $("timelineEnd");
+      if (endLabel) endLabel.textContent = formatTime(duration);
+    }
+    function updateTimelineBar(bar, caption, duration) {
+      const start = Math.max(0, Number(caption.start) || 0);
+      const end = Math.max(start + 0.1, Number(caption.end) || start + 0.1);
+      bar.style.left = `${clamp(start / duration * 100, 0, 100)}%`;
+      bar.style.width = `${Math.max(0.35, clamp((end - start) / duration * 100, 0.35, 100))}%`;
+      const displayDuration = Math.max(0, end - start);
+      bar.title = `字幕${String(Number(bar.dataset.index) + 1).padStart(2, "0")}：${formatTime(start)} ～ ${formatTime(end)}（表示 ${displayDuration.toFixed(2)}秒）`;
+      const timeLabel = bar.querySelector(".timeline-caption-time");
+      if (timeLabel) timeLabel.textContent = `${formatTime(start)}–${formatTime(end)} / ${displayDuration.toFixed(2)}秒`;
+    }
+    function renderTimeline() {
+      const track = $("timelineTrack");
+      if (!track) return;
+      const duration = timelineDuration();
+      track.innerHTML = "";
+      const playhead = document.createElement("div");
+      playhead.id = "timelinePlayhead";
+      playhead.className = "timeline-playhead";
+      state.cuts.forEach((cut, index) => {
+        const band = document.createElement("div");
+        band.className = "timeline-cut";
+        const start = Math.max(0, Number(cut.start) || 0);
+        const end = Math.max(start, Number(cut.end) || start);
+        band.style.left = `${clamp(start / duration * 100, 0, 100)}%`;
+        band.style.width = `${Math.max(0, clamp((end - start) / duration * 100, 0, 100))}%`;
+        band.title = `カット${String(index + 1).padStart(2, "0" )}：${formatTime(start)} ～ ${formatTime(end)}`;
+        const label = document.createElement("span");
+        label.className = "timeline-cut-label";
+        label.textContent = "カット";
+        band.append(label);
+        track.append(band);
+      });
+      track.append(playhead);
+      state.captions.forEach((caption, index) => {
+        const bar = document.createElement("div");
+        bar.className = "timeline-caption" + (state.selected === index ? " active" : "");
+        bar.dataset.index = String(index);
+        const label = document.createElement("span");
+        label.className = "timeline-caption-label";
+        label.textContent = `${String(index + 1).padStart(2, "0")} ${String(caption.text || "").replace(/\s+/g, " ")}`;
+        const timeLabel = document.createElement("span");
+        timeLabel.className = "timeline-caption-time";
+        const startHandle = document.createElement("span");
+        startHandle.className = "timeline-caption-handle start";
+        const endHandle = document.createElement("span");
+        endHandle.className = "timeline-caption-handle end";
+        bar.append(label, timeLabel, startHandle, endHandle);
+        updateTimelineBar(bar, caption, duration);
+        bar.addEventListener("pointerdown", event => beginTimelineDrag(event, index, "move"));
+        startHandle.addEventListener("pointerdown", event => beginTimelineDrag(event, index, "start"));
+        endHandle.addEventListener("pointerdown", event => beginTimelineDrag(event, index, "end"));
+        bar.addEventListener("click", event => { event.stopPropagation(); selectCaption(index, true); });
+        bar.addEventListener("dblclick", event => { event.stopPropagation(); selectCaption(index, true); revealCaptionCard(index, true); });
+        track.append(bar);
+      });
+      applyTimelineZoom();
+      updateTimelinePlayhead();
+    }
+    function beginTimelineDrag(event, index, mode) {
+      if (event.button !== undefined && event.button !== 0) return;
+      const caption = state.captions[index];
+      const track = $("timelineTrack");
+      const bar = event.currentTarget.closest(".timeline-caption");
+      if (!caption || !track || !bar) return;
+      const duration = timelineDuration();
+      pushUndo(mode === "move" ? "字幕位置の移動" : "字幕の開始・終了位置の調整");
+      state.timelineDrag = {
+        index,
+        mode,
+        caption,
+        bar,
+        track,
+        duration,
+        startClientX: event.clientX,
+        originalStart: caption.start,
+        originalEnd: caption.end,
+        moved: false
+      };
+      selectCaption(index, true);
+      bar.classList.add("dragging");
+      if (event.currentTarget.setPointerCapture) event.currentTarget.setPointerCapture(event.pointerId);
+      event.preventDefault();
+      event.stopPropagation();
+      setStatus(`字幕${String(index + 1).padStart(2, "0")}をタイムラインで調整中…`);
+    }
+    function moveTimelineDrag(event) {
+      const drag = state.timelineDrag;
+      if (!drag) return;
+      const rect = drag.track.getBoundingClientRect();
+      if (!rect.width) return;
+      const delta = (event.clientX - drag.startClientX) / rect.width * drag.duration;
+      const snapTime = value => Math.round(value * 100) / 100;
+      const originalLength = drag.originalEnd - drag.originalStart;
+      let start = drag.originalStart;
+      let end = drag.originalEnd;
+      if (drag.mode === "move") {
+        start = snapTime(clamp(drag.originalStart + delta, 0, Math.max(0, drag.duration - originalLength)));
+        end = snapTime(start + originalLength);
+      } else if (drag.mode === "start") {
+        start = snapTime(clamp(drag.originalStart + delta, 0, drag.originalEnd - 0.1));
+      } else {
+        end = snapTime(clamp(drag.originalEnd + delta, drag.originalStart + 0.1, drag.duration));
+      }
+      drag.caption.start = start;
+      drag.caption.end = end;
+      drag.moved = true;
+      updateTimelineBar(drag.bar, drag.caption, drag.duration);
+      updateTimelinePlayhead();
+      updateOverlay();
+      setStatus(`字幕${String(drag.index + 1).padStart(2, "0")}：${formatTime(start)} ～ ${formatTime(end)}`);
+      event.preventDefault();
+    }
+    function endTimelineDrag() {
+      const drag = state.timelineDrag;
+      if (!drag) return;
+      drag.bar.classList.remove("dragging");
+      state.timelineDrag = null;
+      if (drag.moved) {
+        renderCaptions();
+        setStatus(`字幕${String(drag.index + 1).padStart(2, "0")}の表示時間を更新しました`);
+      }
+    }
+    function beginTimelinePan(event) {
+      if (event.button !== undefined && event.button !== 0) return;
+      if (event.target.closest(".timeline-caption")) return;
+      const viewport = $("timelineViewport");
+      if (!viewport) return;
+      state.timelinePan = {
+        viewport,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        startScrollLeft: viewport.scrollLeft,
+        startTarget: event.target,
+        moved: false
+      };
+      viewport.classList.add("dragging");
+      if (viewport.setPointerCapture) viewport.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    }
+    function moveTimelinePan(event) {
+      const pan = state.timelinePan;
+      if (!pan) return;
+      const delta = event.clientX - pan.startClientX;
+      const verticalDelta = event.clientY - pan.startClientY;
+      if (Math.abs(delta) > 2 || Math.abs(verticalDelta) > 2) pan.moved = true;
+      pan.viewport.scrollLeft = pan.startScrollLeft - delta;
+      event.preventDefault();
+    }
+    function endTimelinePan(event) {
+      const pan = state.timelinePan;
+      if (!pan) return;
+      pan.viewport.classList.remove("dragging");
+      state.timelinePan = null;
+      if (pan.moved) {
+        state.suppressTimelineClick = true;
+        setTimeout(() => { state.suppressTimelineClick = false; }, 0);
+      } else if (pan.startTarget && pan.startTarget.closest("#timelineTrack") && !pan.startTarget.closest(".timeline-caption")) {
+        state.suppressTimelineClick = true;
+        seekTimelineAtClientX(event && Number.isFinite(event.clientX) ? event.clientX : pan.startClientX);
+        setTimeout(() => { state.suppressTimelineClick = false; }, 0);
+      }
+    }
+    function seekTimelineAtClientX(clientX) {
+      const track = $("timelineTrack");
+      if (!track) return;
+      const duration = timelineDuration();
+      const rect = track.getBoundingClientRect();
+      if (!rect.width) return;
+      seekVideo(clamp((clientX - rect.left) / rect.width * duration, 0, duration));
+    }
+    function seekTimelineTrack(event) {
+      if (state.suppressTimelineClick) return;
+      if (event.target.closest(".timeline-caption")) return;
+      seekTimelineAtClientX(event.clientX);
+    }
+
+    function renderCaptions() {
+      const list = $("captionList");
+      state.textUndoCaptured = false;
+      list.innerHTML = "";
+      if (!state.captions.length) {
+        list.innerHTML = '<div class="empty">まだ字幕がありません</div>';
+        state.selected = -1;
+        renderTimeline();
+        updateOverlay();
+        return;
+      }
+      state.captions.forEach((caption, index) => {
+        const card = document.createElement("div");
+        card.className = "caption-card" + (state.selected === index ? " active" : "");
+        card.dataset.index = index;
+        const number = document.createElement("div");
+        number.className = "caption-number";
+        number.textContent = String(index + 1).padStart(2, "0");
+        const text = document.createElement("textarea");
+        text.className = "caption-text";
+        text.title = "字幕本文。改行できます。赤文字は [[赤]]重要な部分[[/赤]] の形式です。";
+        text.value = caption.text;
+        text.addEventListener("input", () => { caption.text = text.value; updateOverlay(); });
+        text.addEventListener("focus", () => {
+          if (!state.textUndoCaptured) { pushUndo("字幕本文の編集"); state.textUndoCaptured = true; }
+          state.selected = index;
+          $("selectedLabel").textContent = `字幕${String(index + 1).padStart(2, "0")}`;
+          document.querySelectorAll(".caption-card").forEach((item, itemIndex) => item.classList.toggle("active", itemIndex === index));
+          updateOverlay();
+        });
+        text.addEventListener("blur", () => { state.textUndoCaptured = false; });
+        const remove = document.createElement("button");
+        remove.className = "danger";
+        remove.textContent = "削除";
+        remove.addEventListener("click", event => { event.stopPropagation(); pushUndo("字幕の削除"); state.captions.splice(index, 1); state.selected = Math.min(state.selected, state.captions.length - 1); renderCaptions(); });
+        const meta = document.createElement("div");
+        meta.className = "caption-meta";
+        const startInput = document.createElement("input");
+        startInput.type = "number"; startInput.step = "0.01"; startInput.min = "0"; startInput.value = caption.start.toFixed(2); startInput.title = "開始秒";
+        const endInput = document.createElement("input");
+        endInput.type = "number"; endInput.step = "0.01"; endInput.min = "0"; endInput.value = caption.end.toFixed(2); endInput.title = "終了秒";
+        startInput.addEventListener("change", () => { pushUndo("字幕の開始位置編集"); caption.start = Math.max(0, Number(startInput.value) || 0); if (caption.end <= caption.start) caption.end = caption.start + 0.1; renderCaptions(); });
+        endInput.addEventListener("change", () => { pushUndo("字幕の終了位置編集"); caption.end = Math.max(caption.start + 0.1, Number(endInput.value) || caption.start + 0.1); renderCaptions(); });
+        const duplicate = document.createElement("button");
+        duplicate.textContent = "字幕を複製";
+        duplicate.addEventListener("click", event => { event.stopPropagation(); duplicateCaption(index); });
+        const copyTextButton = document.createElement("button");
+        copyTextButton.textContent = "本文コピー";
+        copyTextButton.addEventListener("click", event => { event.stopPropagation(); copyText(caption.text, copyTextButton); });
+        const jump = document.createElement("button");
+        jump.textContent = "この字幕へ";
+        jump.addEventListener("click", () => { selectCaption(index, true); revealCaptionCard(index, true); });
+        const setStart = document.createElement("button");
+        setStart.textContent = "開始←現在位置";
+        setStart.addEventListener("click", () => { pushUndo("字幕の開始位置設定"); caption.start = Math.max(0, video.currentTime || 0); if (caption.end <= caption.start) caption.end = caption.start + 0.1; renderCaptions(); });
+        const setEnd = document.createElement("button");
+        setEnd.textContent = "終了←現在位置";
+        setEnd.addEventListener("click", () => { pushUndo("字幕の終了位置設定"); caption.end = Math.max(caption.start + 0.1, video.currentTime || caption.start + 0.1); renderCaptions(); });
+        meta.append("開始", startInput, "終了", endInput, duplicate, copyTextButton, jump, setStart, setEnd);
+        decorateNumberInput(startInput); decorateNumberInput(endInput);
+        const styleDetails = document.createElement("details");
+        styleDetails.className = "caption-style";
+        styleDetails.addEventListener("click", event => event.stopPropagation());
+        const styleSummary = document.createElement("summary");
+        styleSummary.textContent = "この字幕の見た目を個別設定";
+        const enabledLabel = document.createElement("label");
+        enabledLabel.className = "caption-style-enabled";
+        const enabled = document.createElement("input");
+        enabled.type = "checkbox"; enabled.checked = Boolean(caption.visual);
+        enabledLabel.append(enabled, "この字幕だけ上書き");
+        const styleGrid = document.createElement("div");
+        styleGrid.className = "caption-style-grid";
+        const styleFields = [
+          ["吹き出し幅", "bubbleWidth", 5, 95], ["文字サイズ", "bubbleFont", 50, 180],
+          ["ボブ横（左%）", "bobX", 0, 100], ["ボブ縦（下%）", "bobY", 0, 100],
+          ["ボブ大きさ", "bobSize", 0.5, 40], ["吹き出し横（左%）", "bubbleX", 0, 100],
+          ["吹き出し縦（下%）", "bubbleY", 0, 100]
+        ];
+        const inputs = {};
+        const currentSettings = effectiveVisualSettings(caption);
+        styleFields.forEach(([labelText, key, min, max]) => {
+          const label = document.createElement("label"); label.textContent = labelText;
+          const input = document.createElement("input"); input.type = "number"; input.min = min; input.max = max; input.step = ["bobX", "bobY", "bubbleX", "bubbleY"].includes(key) ? "0.1" : (key === "bobSize" ? "0.5" : "1"); input.value = currentSettings[key]; input.disabled = !enabled.checked;
+          input.addEventListener("input", () => {
+            if (!caption.visual) caption.visual = { ...visualSettings() };
+            const entered = Number(input.value);
+            caption.visual[key] = clamp(Number.isFinite(entered) ? entered : currentSettings[key], min, max);
+            updateOverlay();
+          });
+          label.append(input); styleGrid.append(label); inputs[key] = input; decorateNumberInput(input);
+        });
+        const motionLabel = document.createElement("label"); motionLabel.textContent = "ボブの動き";
+        const motionInput = document.createElement("select"); motionInput.disabled = !enabled.checked;
+        [["none", "なし"], ["bounce", "ぴょんぴょん"], ["bounceStrong", "ぴょんぴょん（強め・速め）"], ["think", "考え中（左右）"], ["thinkStrong", "考え中（大きめ・速め）"]].forEach(([value, label]) => { const option = document.createElement("option"); option.value = value; option.textContent = label; motionInput.append(option); });
+        motionInput.value = normalizeMotion(currentSettings.motion);
+        motionInput.addEventListener("change", () => { if (!caption.visual) caption.visual = { ...visualSettings() }; caption.visual.motion = normalizeMotion(motionInput.value); updateOverlay(); });
+        motionLabel.append(motionInput); styleGrid.append(motionLabel); inputs.motion = motionInput;
+        const resetStyle = document.createElement("button");
+        resetStyle.type = "button"; resetStyle.textContent = "共通設定に戻す";
+        resetStyle.addEventListener("click", () => { caption.visual = null; enabled.checked = false; const global = visualSettings(); Object.keys(inputs).forEach(key => { inputs[key].value = global[key]; inputs[key].disabled = true; }); updateOverlay(); });
+        enabled.addEventListener("change", () => {
+          if (enabled.checked) caption.visual = { ...visualSettings() };
+          else caption.visual = null;
+          const next = effectiveVisualSettings(caption); Object.keys(inputs).forEach(key => { inputs[key].value = next[key]; inputs[key].disabled = !enabled.checked; }); updateOverlay();
+        });
+        styleDetails.append(styleSummary, enabledLabel, styleGrid, resetStyle);
+        card.append(number, text, remove, meta, styleDetails);
+        card.addEventListener("click", () => selectCaption(index, true));
+        list.append(card);
+      });
+      renderTimeline();
+      updateOverlay();
+    }
+
+    function selectCaption(index, moveVideo) {
+      if (!state.captions.length) return;
+      const changed = state.selected !== index;
+      state.selected = clamp(index, 0, state.captions.length - 1);
+      if (moveVideo) seekVideo(state.captions[state.selected].start);
+      $("selectedLabel").textContent = `字幕${String(state.selected + 1).padStart(2, "0")}`;
+      if (changed) renderCaptions();
+      else updateOverlay();
+    }
+    function revealCaptionCard(index, openSettings) {
+      const card = document.querySelector(`.caption-card[data-index="${index}"]`);
+      if (!card) return;
+      if (openSettings) {
+        const details = card.querySelector(".caption-style");
+        if (details) details.open = true;
+      }
+      card.classList.remove("jump-target");
+      void card.offsetWidth;
+      card.classList.add("jump-target");
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(() => card.classList.remove("jump-target"), 1400);
+    }
+
+    function updateOverlay() {
+      const current = Number(video.currentTime) || 0;
+      const caption = state.captions.find(item => current >= item.start && current < item.end);
+      const stageScale = updatePreviewScale();
+      $("overlay").style.display = caption ? "block" : "none";
+      updateBobVisibility();
+      const settings = effectiveVisualSettings(caption);
+      const motion = caption ? normalizeMotion(settings.motion) : "none";
+      const motionKey = `${caption ? caption.id : ""}:${motion}`;
+      if (state.activeMotionKey !== motionKey) {
+        const bob = $("bob");
+        bob.classList.remove("bob-motion-bounce", "bob-motion-bounceStrong", "bob-motion-think", "bob-motion-thinkStrong");
+        void bob.offsetWidth;
+        if (motion !== "none") bob.classList.add(`bob-motion-${motion}`);
+        state.activeMotionKey = motionKey;
+      }
+      $("bubble").innerHTML = caption ? renderRichText(caption.text) : "";
+      $("bubble").style.width = `${settings.bubbleWidth}%`;
+      $("bubble").style.maxWidth = "none";
+      $("bubble").style.fontSize = `${REFERENCE_BUBBLE_FONT_PX * stageScale * settings.bubbleFont / 100}px`;
+      $("overlay").style.setProperty("--bob-x", settings.bobX);
+      $("overlay").style.setProperty("--bob-y", settings.bobY);
+      $("overlay").style.setProperty("--bob-width", `${Math.max(4, VIDEO_REFERENCE_WIDTH * settings.bobSize / 100 * stageScale)}px`);
+      $("overlay").style.setProperty("--bubble-x", settings.bubbleX);
+      $("overlay").style.setProperty("--bubble-y", settings.bubbleY);
+      $("overlay").style.setProperty("--bubble-width", `${settings.bubbleWidth}%`);
+      document.querySelectorAll(".caption-card").forEach((card, index) => card.classList.toggle("active", state.selected === index));
+      document.querySelectorAll(".timeline-caption").forEach((bar, index) => bar.classList.toggle("active", state.selected === index));
+      updateTimelinePlayhead();
+      $("timeDisplay").textContent = `${formatTime(current)} / ${formatTime(video.duration)}`;
+    }
+
+    function activeCaption() {
+      const current = Number(video.currentTime) || 0;
+      return state.captions.find(item => current >= item.start && current < item.end) || null;
+    }
+    function beginOverlayDrag(event, kind) {
+      if (event.button !== undefined && event.button !== 0) return;
+      const caption = activeCaption();
+      if (!caption) { setStatus("字幕が表示されている間だけ位置をドラッグできます"); return; }
+      const settings = effectiveVisualSettings(caption);
+      const keyX = kind === "bob" ? "bobX" : "bubbleX";
+      const keyY = kind === "bob" ? "bobY" : "bubbleY";
+      const rect = $("video-stage").getBoundingClientRect();
+      pushUndo(kind === "bob" ? "ボブ位置の移動" : "吹き出し位置の移動");
+      state.drag = { kind, caption, keyX, keyY, startClientX: event.clientX, startClientY: event.clientY, startX: settings[keyX], startY: settings[keyY], element: event.currentTarget };
+      video.pause(); event.currentTarget.classList.add("dragging");
+      if (event.currentTarget.setPointerCapture) event.currentTarget.setPointerCapture(event.pointerId);
+      event.preventDefault(); event.stopPropagation();
+      setStatus(`${kind === "bob" ? "ボブ" : "吹き出し"}をドラッグ中…`);
+    }
+    function moveOverlayDrag(event) {
+      const drag = state.drag; if (!drag) return;
+      const rect = $("video-stage").getBoundingClientRect();
+      const dx = (event.clientX - drag.startClientX) / rect.width * 100;
+      const dy = (drag.startClientY - event.clientY) / rect.height * 100;
+      const nextX = snapPercent(clamp(drag.startX + dx, 0, 100));
+      const nextY = snapPercent(clamp(drag.startY + dy, 0, 100));
+      if (drag.caption.visual) {
+        drag.caption.visual[drag.keyX] = nextX;
+        drag.caption.visual[drag.keyY] = nextY;
+      } else {
+        $(drag.keyX).value = nextX.toFixed(1);
+        $(drag.keyY).value = nextY.toFixed(1);
+      }
+      updateOverlay(); event.preventDefault();
+    }
+    function endOverlayDrag() {
+      if (!state.drag) return;
+      state.drag.element.classList.remove("dragging"); state.drag = null;
+      renderCaptions(); setStatus("ドラッグした位置を反映しました");
+    }
+
+    async function copyText(text, button) {
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (_) {
+        const area = document.createElement("textarea");
+        area.value = text; document.body.appendChild(area); area.select(); document.execCommand("copy"); area.remove();
+      }
+      const original = button.textContent; button.textContent = "コピーしました";
+      setTimeout(() => { button.textContent = original; }, 900);
+    }
+
+    function duplicateCaption(index) {
+      const original = state.captions[index];
+      if (!original) return;
+      pushUndo("字幕カードの複製");
+      const duration = Math.max(0.1, Number(original.end) - Number(original.start));
+      const gap = $("keepGap").checked ? 0.25 : 0;
+      const start = Number(original.end) + gap;
+      const shift = duration + gap;
+      state.captions.slice(index + 1).forEach(caption => {
+        caption.start += shift;
+        caption.end += shift;
+      });
+      const clone = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        start,
+        end: start + duration,
+        text: original.text,
+        visual: original.visual ? { ...original.visual } : null,
+        autoTiming: false
+      };
+      state.captions.splice(index + 1, 0, clone);
+      state.selected = index + 1;
+      renderCaptions();
+      if (video.src) seekVideo(clone.start);
+      revealCaptionCard(index + 1, false);
+      setStatus(`字幕${String(index + 1).padStart(2, "0")}を複製しました`);
+    }
+
+    function resetTimes(recordUndo = true) {
+      if (recordUndo && state.captions.length) pushUndo("字幕時間の自動配置");
+      let cursor = 0;
+      const gap = $("keepGap").checked ? 0.25 : 0;
+      state.captions.forEach(caption => { const duration = estimateDuration(caption.text); caption.start = cursor; caption.end = cursor + duration; cursor += duration + gap; });
+      renderCaptions();
+    }
+
+    function fitToVideo(recordUndo = true) {
+      if (!Number.isFinite(video.duration) || !video.duration || !state.captions.length) return;
+      if (recordUndo) pushUndo("字幕時間を動画に合わせる");
+      resetTimes(false);
+      const last = state.captions[state.captions.length - 1].end;
+      const usable = Math.max(0.1, video.duration - 0.1);
+      const scale = usable / last;
+      state.captions.forEach(caption => { caption.start *= scale; caption.end *= scale; });
+      state.captionsAutoTimed = false;
+      renderCaptions();
+    }
+
+    function addParsedCaptions(raw) {
+      const parsed = normalizeCaptions(parseScript(raw));
+      if (!parsed.length) { setStatus("字幕を読み込めませんでした。形式を確認してください"); return; }
+      pushUndo("字幕の読み込み");
+      state.captions = parsed; state.selected = 0; state.captionsAutoTimed = parsed.some(item => item.autoTiming);
+      const needsFit = Number.isFinite(video.duration) && video.duration > 0 && parsed[parsed.length - 1].end > video.duration;
+      if (needsFit) {
+        fitToVideo(false);
+        setStatus(`${parsed.length}枚の字幕を作成し、動画の長さに合わせました`);
+      } else {
+        renderCaptions();
+        setStatus(`${parsed.length}枚の字幕を作成しました`);
+      }
+    }
+
+    function saveProject() {
+      const project = { version: 5, app: "BobVideoEditor", sourceVideoName: state.sourceVideoName, bobDataUrl: state.bobDataUrl, showBuiltInBob: state.showBuiltInBob, visual: visualSettings(), captions: state.captions, cuts: state.cuts };
+      const blob = new Blob([JSON.stringify(project, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "bob-video-project.json"; a.click(); URL.revokeObjectURL(url);
+      setStatus("プロジェクトを保存しました");
+    }
+
+    function roundedRectPath(ctx, x, y, width, height, radius) {
+      const r = Math.min(radius, width / 2, height / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + width, y, x + width, y + height, r);
+      ctx.arcTo(x + width, y + height, x, y + height, r);
+      ctx.arcTo(x, y + height, x, y, r);
+      ctx.arcTo(x, y, x + width, y, r);
+      ctx.closePath();
+    }
+
+    function canvasRuns(text) {
+      const runs = [];
+      let red = false;
+      const tokens = String(text || "").split(/(\[\[赤\]\]|\[\[\/赤\]\]|【赤】|【\/赤】)/g);
+      for (const token of tokens) {
+        if (!token) continue;
+        if (["[[赤]]", "【赤】"].includes(token)) { red = true; continue; }
+        if (["[[/赤]]", "【/赤】"].includes(token)) { red = false; continue; }
+        runs.push({ text: token, red });
+      }
+      return runs;
+    }
+
+    function wrapCanvasRuns(ctx, text, maxWidth) {
+      const lines = [];
+      let line = [];
+      let lineWidth = 0;
+      const pushLine = () => { if (line.length) lines.push(line); line = []; lineWidth = 0; };
+      for (const run of canvasRuns(text)) {
+        for (const character of Array.from(run.text)) {
+          if (character === "\n") { pushLine(); continue; }
+          const width = ctx.measureText(character).width;
+          if (line.length && lineWidth + width > maxWidth) pushLine();
+          line.push({ character, red: run.red });
+          lineWidth += width;
+        }
+      }
+      pushLine();
+      return lines.length ? lines : [[{ character: "", red: false }]];
+    }
+
+    function bobMotionState(motion, elapsed, diameter) {
+      const type = normalizeMotion(motion);
+      if (type === "bounce") {
+        const phase = elapsed * Math.PI * 2 / .8;
+        return { x: 0, y: -Math.max(0, Math.sin(phase)) * diameter * .35, angle: 0 };
+      }
+      if (type === "bounceStrong") {
+        const phase = elapsed * Math.PI * 2 / .58;
+        return { x: 0, y: -Math.max(0, Math.sin(phase)) * diameter * .65, angle: 0 };
+      }
+      if (type === "think") {
+        const phase = elapsed * Math.PI * 2 / 1.2;
+        return { x: Math.sin(phase) * diameter * .35, y: 0, angle: Math.sin(phase) * .08 };
+      }
+      if (type === "thinkStrong") {
+        const phase = elapsed * Math.PI * 2 / .82;
+        return { x: Math.sin(phase) * diameter * .65, y: 0, angle: Math.sin(phase) * .14 };
+      }
+      return { x: 0, y: 0, angle: 0 };
+    }
+
+    function drawBobCanvas(ctx, width, height, settings, image, motion, elapsed) {
+      const diameter = Math.max(4, width * settings.bobSize / 100);
+      const baseX = width * settings.bobX / 100;
+      const baseY = height - height * settings.bobY / 100 - diameter / 2;
+      const movement = bobMotionState(motion, elapsed, diameter);
+      ctx.save();
+      ctx.translate(baseX + movement.x, baseY + movement.y);
+      ctx.rotate(movement.angle);
+      if (image) {
+        const ratio = Math.min(diameter / image.width, diameter / image.height);
+        const drawWidth = image.width * ratio;
+        const drawHeight = image.height * ratio;
+        ctx.drawImage(image, -drawWidth / 2, diameter / 2 - drawHeight, drawWidth, drawHeight);
+        ctx.restore();
+        return;
+      }
+      ctx.shadowColor = "rgba(0,0,0,.35)"; ctx.shadowBlur = 5; ctx.shadowOffsetY = 4;
+      const glowRadius = diameter / 2 + Math.max(2, diameter * .62);
+      const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, glowRadius);
+      glow.addColorStop(0, "rgba(5, 9, 168, 1)");
+      glow.addColorStop(.42, "rgba(20, 32, 188, .98)");
+      glow.addColorStop(.62, "rgba(38, 166, 235, .72)");
+      glow.addColorStop(.78, "rgba(89, 231, 255, .34)");
+      glow.addColorStop(1, "rgba(164, 251, 255, 0)");
+      ctx.shadowColor = "rgba(91, 235, 255, .55)"; ctx.shadowBlur = Math.max(2, diameter * .35); ctx.shadowOffsetY = 0;
+      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, glowRadius, 0, Math.PI * 2); ctx.fill();
+      const tailWidth = clamp(diameter * .24, 2, 22); const tailHeight = clamp(diameter * .24, 2, 22);
+      const tail = ctx.createLinearGradient(0, diameter / 2, 0, diameter / 2 + tailHeight * 1.4);
+      tail.addColorStop(0, "rgba(53, 219, 229, .82)"); tail.addColorStop(1, "rgba(53, 219, 229, 0)");
+      ctx.shadowColor = "transparent"; ctx.fillStyle = tail;
+      ctx.beginPath(); ctx.moveTo(-tailWidth / 2, diameter / 2); ctx.lineTo(tailWidth / 2, diameter / 2); ctx.lineTo(0, diameter / 2 + tailHeight); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+
+    function drawCaptionCanvas(ctx, width, height, text, settings) {
+      const bubbleWidth = width * settings.bubbleWidth / 100;
+      const scale = width / VIDEO_REFERENCE_WIDTH;
+      const padding = Math.max(4, 14 * scale);
+      const fontSize = Math.max(8, REFERENCE_BUBBLE_FONT_PX * scale * settings.bubbleFont / 100);
+      const lineHeight = fontSize * 1.4;
+      ctx.font = `700 ${fontSize}px system-ui, -apple-system, sans-serif`;
+      const lines = wrapCanvasRuns(ctx, text, bubbleWidth - padding * 2);
+      const bubbleHeight = lines.length * lineHeight + padding * 2;
+      const x = width * settings.bubbleX / 100;
+      const y = height - height * settings.bubbleY / 100 - bubbleHeight;
+      ctx.save();
+      ctx.fillStyle = "#fff"; ctx.strokeStyle = "#1c2530"; ctx.lineWidth = Math.max(1, 3 * scale);
+      roundedRectPath(ctx, x, y, bubbleWidth, bubbleHeight, Math.max(4, 15 * scale)); ctx.fill(); ctx.stroke();
+      const tailX = x + bubbleWidth * .82;
+      const tailHalfWidth = 13 * scale; const tailBaseY = y + bubbleHeight - 2 * scale; const tailTipY = y + bubbleHeight + 22 * scale;
+      ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.moveTo(tailX - tailHalfWidth, tailBaseY); ctx.lineTo(tailX + tailHalfWidth, tailBaseY); ctx.lineTo(tailX, tailTipY); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "#1c2530"; ctx.beginPath(); ctx.moveTo(tailX - tailHalfWidth, tailBaseY); ctx.lineTo(tailX, tailTipY); ctx.lineTo(tailX + tailHalfWidth, tailBaseY); ctx.stroke();
+      ctx.fillStyle = "#1c2530";
+      lines.forEach((line, lineIndex) => {
+        let cursorX = x + padding;
+        const baseline = y + padding + fontSize + lineIndex * lineHeight;
+        for (const part of line) { ctx.fillStyle = part.red ? "#e43b2d" : "#1c2530"; ctx.fillText(part.character, cursorX, baseline); cursorX += ctx.measureText(part.character).width; }
+      });
+      ctx.restore();
+    }
+
+    function loadImage(dataUrl) {
+      return new Promise((resolve, reject) => {
+        if (!dataUrl) return resolve(null);
+        const image = new Image(); image.onload = () => resolve(image); image.onerror = reject; image.src = dataUrl;
+      });
+    }
+
+    function drawVideoCover(ctx, source, width, height) {
+      const sourceWidth = source.videoWidth;
+      const sourceHeight = source.videoHeight;
+      const targetRatio = width / height;
+      const sourceRatio = sourceWidth / sourceHeight;
+      let sx = 0; let sy = 0; let sw = sourceWidth; let sh = sourceHeight;
+      if (sourceRatio > targetRatio) {
+        sw = sourceHeight * targetRatio;
+        sx = (sourceWidth - sw) / 2;
+      } else if (sourceRatio < targetRatio) {
+        sh = sourceWidth / targetRatio;
+        sy = (sourceHeight - sh) / 2;
+      }
+      ctx.drawImage(source, sx, sy, sw, sh, 0, 0, width, height);
+    }
+
+    function setExportProgress(value, message) {
+      const progress = $("exportProgress"); const label = $("exportStatus");
+      progress.hidden = false; label.hidden = false; progress.value = clamp(value, 0, 100); label.textContent = message;
+      const overlay = $("exportOverlay");
+      if (overlay) overlay.hidden = false;
+      const overlayProgress = $("exportOverlayProgress");
+      const overlayPercent = $("exportOverlayPercent");
+      const overlayMessage = $("exportOverlayMessage");
+      const close = $("exportOverlayClose");
+      if (overlayProgress) overlayProgress.value = clamp(value, 0, 100);
+      if (overlayPercent) overlayPercent.textContent = `${Math.round(clamp(value, 0, 100))}%`;
+      if (overlayMessage) overlayMessage.textContent = message;
+      if (close) close.hidden = value < 100;
+    }
+    function clearExportProgress() {
+      $("exportProgress").hidden = true; $("exportStatus").hidden = true; $("exportProgress").value = 0;
+      const overlay = $("exportOverlay");
+      if (overlay) overlay.hidden = true;
+      const close = $("exportOverlayClose");
+      if (close) close.hidden = true;
+    }
+
+    async function renderVideoFile() {
+      if (!video.src || !video.videoWidth || !video.duration) { setStatus("先に動画を読み込んでください"); return; }
+      if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) { setStatus("このブラウザは動画書き出しに対応していません"); return; }
+      const button = $("renderVideo"); button.disabled = true;
+      const originalTime = video.currentTime; const wasPaused = video.paused;
+      const outputWidth = video.videoWidth >= 1920 ? 1920 : 1280;
+      const outputHeight = outputWidth * VIDEO_REFERENCE_HEIGHT / VIDEO_REFERENCE_WIDTH;
+      const canvas = document.createElement("canvas"); canvas.width = outputWidth; canvas.height = outputHeight;
+      const ctx = canvas.getContext("2d"); const bobImage = await loadImage(state.bobDataUrl);
+      const exportFrameRate = 60;
+      let canvasStream;
+      let canvasTrack;
+      let manualFrameCapture = false;
+      try {
+        canvasStream = canvas.captureStream(0);
+        canvasTrack = canvasStream.getVideoTracks()[0];
+        manualFrameCapture = Boolean(canvasTrack && typeof canvasTrack.requestFrame === "function");
+        if (!manualFrameCapture) canvasStream.getTracks().forEach(track => track.stop());
+      } catch (_) {
+        canvasStream = null;
+      }
+      if (!canvasStream || !manualFrameCapture) {
+        canvasStream = canvas.captureStream(exportFrameRate);
+        canvasTrack = canvasStream.getVideoTracks()[0];
+      }
+      const sourceStream = video.captureStream ? video.captureStream() : video.mozCaptureStream?.();
+      const tracks = [...canvasStream.getVideoTracks(), ...(sourceStream ? sourceStream.getAudioTracks() : [])];
+      const stream = new MediaStream(tracks);
+      const formats = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
+      const mimeType = formats.find(type => MediaRecorder.isTypeSupported(type));
+      if (!mimeType) { setStatus("このブラウザで利用できる動画形式がありません"); button.disabled = false; return; }
+      const chunks = []; const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
+      recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+      const stopped = new Promise(resolve => { recorder.onstop = resolve; });
+      let motionCaptionId = "";
+      let motionStartedAt = 0;
+      const drawFrame = () => {
+        drawVideoCover(ctx, video, canvas.width, canvas.height);
+        const caption = state.captions.find(item => video.currentTime >= item.start && video.currentTime < item.end);
+        if (caption) {
+          if (motionCaptionId !== caption.id) { motionCaptionId = caption.id; motionStartedAt = performance.now(); }
+          const settings = effectiveVisualSettings(caption);
+          const motionElapsed = Math.max(0, (performance.now() - motionStartedAt) / 1000);
+          drawCaptionCanvas(ctx, canvas.width, canvas.height, caption.text, settings);
+          if (bobImage || state.showBuiltInBob) drawBobCanvas(ctx, canvas.width, canvas.height, settings, bobImage, settings.motion, motionElapsed);
+        } else {
+          motionCaptionId = "";
+        }
+      };
+      let raf = 0;
+      let frameTimer = 0;
+      let lastProgressAt = 0;
+      let nextCaptureAt = 0;
+      const frameInterval = 1000 / exportFrameRate;
+      const updateExportProgress = now => {
+        if (now - lastProgressAt <= 100) return;
+        const duration = editedDuration();
+        const percent = duration ? sourceToOutput(video.currentTime) / duration * 100 : 0;
+        setExportProgress(percent, `書き出し中 ${percent.toFixed(0)}%`);
+        lastProgressAt = now;
+      };
+      const drawLoop = (timestamp) => {
+        const now = Number.isFinite(timestamp) ? timestamp : performance.now();
+        if (manualFrameCapture) {
+          if (now >= nextCaptureAt - 0.5) {
+            drawFrame();
+            if (canvasTrack && typeof canvasTrack.requestFrame === "function") canvasTrack.requestFrame();
+            updateExportProgress(now);
+            nextCaptureAt = now + frameInterval;
+          }
+          if (!video.ended) frameTimer = setTimeout(() => drawLoop(performance.now()), Math.max(0, nextCaptureAt - performance.now()));
+        } else {
+          drawFrame();
+          updateExportProgress(now);
+          if (!video.ended) raf = requestAnimationFrame(drawLoop);
+        }
+      };
+      let completed = false;
+      try {
+        setExportProgress(0, `書き出し準備中（${exportFrameRate}fps）…`);
+        video.pause(); video.currentTime = 0; await video.play();
+        recorder.start(200); drawLoop();
+        await new Promise(resolve => { const onEnded = () => { video.removeEventListener("ended", onEnded); resolve(); }; video.addEventListener("ended", onEnded); });
+        cancelAnimationFrame(raf); clearTimeout(frameTimer); drawFrame(); recorder.stop(); await stopped;
+        const extension = mimeType.startsWith("video/mp4") ? "mp4" : "webm";
+        const blob = new Blob(chunks, { type: mimeType }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `bob-captioned.${extension}`; link.click(); URL.revokeObjectURL(url);
+        completed = true; setExportProgress(100, `書き出し完了（${extension.toUpperCase()}）`);
+        setStatus(`動画を書き出しました（${extension.toUpperCase()}）`);
+      } catch (error) {
+        setStatus(`動画書き出しに失敗しました：${error.message || error}`);
+      } finally {
+        cancelAnimationFrame(raf); clearTimeout(frameTimer); video.pause(); video.currentTime = Math.min(originalTime, video.duration); if (!wasPaused) video.play(); button.disabled = false; if (!completed) clearExportProgress();
+      }
+    }
+
+    $("videoFile").addEventListener("change", (event) => {
+      const file = event.target.files[0]; if (!file) return;
+      state.sourceVideoName = file.name; state.cuts = []; state.pendingCutStart = null; state.pendingSeek = null; state.undoStack = []; state.textUndoCaptured = false; renderCuts(); video.src = URL.createObjectURL(file); video.load(); setStatus(`動画を読み込みました：${file.name}`);
+      updateCutStatus("削除開始位置を設定してから、終了位置で「ここまでを削除」を押します。");
+    });
+    $("bobFile").addEventListener("change", (event) => {
+      const file = event.target.files[0];
+      if (!file) { state.bobDataUrl = ""; updateBobVisibility(); updateOverlay(); setStatus("ボブ画像を解除しました"); return; }
+      const reader = new FileReader(); reader.onload = () => { state.bobDataUrl = reader.result; $("bobImage").src = reader.result; updateBobVisibility(); updateOverlay(); setStatus("ボブ画像を読み込みました"); }; reader.readAsDataURL(file);
+    });
+    $("scriptFile").addEventListener("change", (event) => {
+      const file = event.target.files[0]; if (!file) return;
+      const reader = new FileReader(); reader.onload = () => { $("scriptInput").value = reader.result; addParsedCaptions(reader.result); }; reader.readAsText(file);
+    });
+    $("projectFile").addEventListener("change", (event) => {
+      const file = event.target.files[0]; if (!file) return;
+      const reader = new FileReader(); reader.onload = () => {
+        try {
+          const project = JSON.parse(reader.result);
+          if (project.app !== "BobVideoEditor" && Array.isArray(project.captions)) {
+            $("scriptInput").value = reader.result;
+            addParsedCaptions(reader.result);
+            return;
+          }
+          pushUndo("プロジェクトの読み込み");
+          state.captions = normalizeCaptions(project.captions || []); state.captionsAutoTimed = false; state.cuts = normalizeCuts(project.cuts || []); state.pendingCutStart = null; state.selected = state.captions.length ? 0 : -1; state.sourceVideoName = project.sourceVideoName || ""; state.showBuiltInBob = project.showBuiltInBob === undefined ? true : Boolean(project.showBuiltInBob); $("showBuiltInBob").checked = state.showBuiltInBob;
+          if (project.bobDataUrl) { state.bobDataUrl = project.bobDataUrl; $("bobImage").src = project.bobDataUrl; $("bobImage").hidden = false; $("bobPlaceholder").hidden = true; }
+          else { state.bobDataUrl = ""; }
+          updateBobVisibility();
+          applyVisualSettings(project.visual || {});
+          renderCuts(); renderCaptions(); setStatus("プロジェクトを読み込みました");
+        } catch (_) { setStatus("プロジェクトJSONを読み込めませんでした"); }
+      }; reader.readAsText(file);
+    });
+    $("parseScript").addEventListener("click", () => addParsedCaptions($("scriptInput").value));
+    $("sampleScript").addEventListener("click", () => { $("scriptInput").value = "字幕: カウンターノードンを呼び出します\n字幕: カウント範囲を0から11に設定します\n字幕: 入力が入るたびにカウントが1増えます"; addParsedCaptions($("scriptInput").value); });
+    $("clearCaptions").addEventListener("click", () => { if (!state.captions.length) return; pushUndo("字幕の全削除"); state.captions = []; state.selected = -1; renderCaptions(); setStatus("字幕を削除しました"); });
+    $("resetTimes").addEventListener("click", resetTimes);
+    $("fitToVideo").addEventListener("click", fitToVideo);
+    $("markCutStart").addEventListener("click", () => {
+      state.pendingCutStart = Math.max(0, video.currentTime || 0);
+      updateCutStatus(`削除開始を${formatTime(state.pendingCutStart)}に設定しました。終了位置で「ここまでを削除」を押してください。`);
+    });
+    $("markCutEnd").addEventListener("click", () => {
+      if (state.pendingCutStart === null) { updateCutStatus("先に「削除開始←現在位置」を設定してください。"); return; }
+      const end = Math.max(0, video.currentTime || 0);
+      const start = Math.min(state.pendingCutStart, end); const finish = Math.max(state.pendingCutStart, end);
+      if (finish - start < 0.05) { updateCutStatus("カット区間が短すぎます。少し離れた位置で終了してください。"); return; }
+      pushUndo("カット区間の追加");
+      state.cuts = normalizeCuts([...state.cuts, { start, end: finish }]); state.pendingCutStart = null; renderCuts(); updateOverlay();
+      updateCutStatus(`カットを追加しました。編集後の長さ：約${formatTime(editedDuration())}`);
+    });
+    $("clearCuts").addEventListener("click", () => { if (!state.cuts.length) return; pushUndo("カット区間の全解除"); state.cuts = []; state.pendingCutStart = null; renderCuts(); updateOverlay(); updateCutStatus("カット区間をすべて解除しました。"); });
+    $("saveProject").addEventListener("click", saveProject);
+    $("renderVideo").addEventListener("click", renderVideoFile);
+    $("toggleSetupPanel").addEventListener("click", event => {
+      const open = document.body.classList.toggle("desktop-setup-open");
+      event.currentTarget.textContent = open ? "台本・設定を閉じる" : "台本・設定";
+      setStatus(open ? "台本・共通設定を表示しました" : "台本・共通設定を折りたたみました");
+    });
+    $("resetPosition").addEventListener("click", () => applyVisualSettings());
+    $("showBuiltInBob").addEventListener("change", event => { state.showBuiltInBob = event.target.checked; updateBobVisibility(); updateOverlay(); });
+    $("bob").addEventListener("pointerdown", event => beginOverlayDrag(event, "bob"));
+    $("bubble").addEventListener("pointerdown", event => beginOverlayDrag(event, "bubble"));
+    $("timelineTrack").addEventListener("click", seekTimelineTrack);
+    $("timelineViewport").addEventListener("pointerdown", beginTimelinePan);
+    $("timelineZoomOut").addEventListener("click", () => setTimelineZoom(state.timelineZoom / 1.5));
+    $("timelineZoomIn").addEventListener("click", () => setTimelineZoom(state.timelineZoom * 1.5));
+    $("timelineZoomReset").addEventListener("click", () => setTimelineZoom(1));
+    $("timelineCutButton").addEventListener("click", markTimelineCut);
+    $("exportOverlayClose").addEventListener("click", clearExportProgress);
+    document.addEventListener("pointermove", moveOverlayDrag);
+    document.addEventListener("pointerup", endOverlayDrag);
+    document.addEventListener("pointercancel", endOverlayDrag);
+    document.addEventListener("pointermove", moveTimelineDrag);
+    document.addEventListener("pointerup", endTimelineDrag);
+    document.addEventListener("pointercancel", endTimelineDrag);
+    document.addEventListener("pointermove", moveTimelinePan);
+    document.addEventListener("pointerup", endTimelinePan);
+    document.addEventListener("pointercancel", endTimelinePan);
+    $("playPause").addEventListener("click", () => video.paused ? video.play() : video.pause());
+    $("stepBack").addEventListener("click", () => { video.pause(); video.currentTime = Math.max(0, video.currentTime - 1 / state.fps); });
+    $("stepForward").addEventListener("click", () => { video.pause(); video.currentTime = Math.min(video.duration || Infinity, video.currentTime + 1 / state.fps); });
+    $("markStart").addEventListener("click", () => { if (state.selected < 0) return; pushUndo("字幕の開始位置設定"); state.captions[state.selected].start = Math.max(0, video.currentTime); if (state.captions[state.selected].end <= state.captions[state.selected].start) state.captions[state.selected].end = state.captions[state.selected].start + 0.1; renderCaptions(); });
+    $("markEnd").addEventListener("click", () => { if (state.selected < 0) return; pushUndo("字幕の終了位置設定"); state.captions[state.selected].end = Math.max(state.captions[state.selected].start + 0.1, video.currentTime); renderCaptions(); });
+    $("jumpSelected").addEventListener("click", () => { if (state.selected >= 0) { seekVideo(state.captions[state.selected].start); revealCaptionCard(state.selected, true); } });
+    [$("bubbleWidth"), $("bubbleFont"), $("bobX"), $("bobY"), $("bobSize"), $("bubbleX"), $("bubbleY")].forEach(input => { decorateNumberInput(input); input.addEventListener("input", updateOverlay); });
+    $("globalMotion").addEventListener("change", updateOverlay);
+    video.addEventListener("timeupdate", updateOverlay); video.addEventListener("timeupdate", skipCutDuringPlayback); video.addEventListener("loadedmetadata", () => {
+      if (state.captions.length && state.captions[state.captions.length - 1].end > video.duration) {
+        fitToVideo(false);
+        setStatus("字幕の表示時間を動画の長さに合わせました");
+        if (state.selected >= 0) state.pendingSeek = state.captions[state.selected].start;
+      }
+      if (state.pendingSeek !== null) seekVideo(state.pendingSeek);
+      renderTimeline();
+      updateOverlay();
+    }); video.addEventListener("durationchange", () => { renderTimeline(); updateOverlay(); });
+    if (window.ResizeObserver) new ResizeObserver(updateOverlay).observe($("video-stage"));
+    else window.addEventListener("resize", updateOverlay);
+    document.addEventListener("keydown", (event) => {
+      if (event.target.matches("input, textarea, select")) return;
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && !event.shiftKey && !event.altKey) { event.preventDefault(); undoLast(); return; }
+      if (event.code === "Space") { event.preventDefault(); video.paused ? video.play() : video.pause(); }
+      if (event.key === "ArrowLeft") { video.currentTime = Math.max(0, video.currentTime - 1 / state.fps); }
+      if (event.key === "ArrowRight") { video.currentTime = Math.min(video.duration || Infinity, video.currentTime + 1 / state.fps); }
+    });
+    const mobileNavButtons = [...document.querySelectorAll(".mobile-nav [data-mobile-target]")];
+    const mobileNavTargets = mobileNavButtons
+      .map(button => document.getElementById(button.dataset.mobileTarget))
+      .filter(Boolean);
+    function setMobileNavActive(targetId) {
+      mobileNavButtons.forEach(button => button.classList.toggle("active", button.dataset.mobileTarget === targetId));
+    }
+    mobileNavButtons.forEach(button => button.addEventListener("click", () => {
+      const target = document.getElementById(button.dataset.mobileTarget);
+      if (!target) return;
+      setMobileNavActive(target.id);
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }));
+    if (window.IntersectionObserver) {
+      const observer = new IntersectionObserver(entries => {
+        const visible = entries.filter(entry => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (visible) setMobileNavActive(visible.target.id);
+      }, { rootMargin: "-145px 0px -45% 0px", threshold: [0.15, 0.5] });
+      mobileNavTargets.forEach(target => observer.observe(target));
+    }
+    renderCuts(); renderCaptions();
+  </script>
+</body>
+</html>
