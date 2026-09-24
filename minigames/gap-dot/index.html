@@ -4,145 +4,257 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#11161d">
-<title>GAP DOT</title>
+<meta name="theme-color" content="#10141a">
+<title>WAVE GATE prototype</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0d1117;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 body{position:fixed;inset:0}
-#wrap{position:relative;width:100vw;height:100dvh;touch-action:none;user-select:none;background:#11161d}
+#wrap{position:relative;width:100vw;height:100dvh;background:#10141a;touch-action:none;user-select:none;overflow:hidden}
 canvas{display:block;width:100%;height:100%}
-#hud{position:absolute;top:calc(env(safe-area-inset-top) + 14px);left:16px;right:16px;display:flex;justify-content:space-between;pointer-events:none}
-.lbl{font-size:11px;color:#9aa6b2}.num{font-size:28px;font-weight:800}
-#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.28)}
-#card{width:min(82vw,320px);padding:24px;border:1px solid #2a323c;border-radius:18px;background:rgba(19,24,31,.95);text-align:center}
-h1{margin:0 0 10px;font-size:30px;letter-spacing:.1em}
-p{color:#c5ccd4;line-height:1.6}
+#hud{position:absolute;top:calc(env(safe-area-inset-top) + 14px);left:16px;right:16px;display:flex;justify-content:space-between;pointer-events:none;z-index:2}
+.lbl{font-size:11px;letter-spacing:.12em;color:#9aa6b2;font-weight:700}.num{font-size:28px;font-weight:800}
+#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.28);z-index:3}
+#card{width:min(84vw,330px);padding:24px;border:1px solid #2a323c;border-radius:18px;background:rgba(19,24,31,.95);text-align:center;box-shadow:0 16px 40px rgba(0,0,0,.35)}
+h1{margin:0 0 10px;font-size:28px;letter-spacing:.1em}
+p{color:#c5ccd4;line-height:1.65;margin:8px 0}
 button{width:100%;padding:14px;border:0;border-radius:12px;font-size:17px;font-weight:800;background:#fff;color:#111}
 .note{font-size:11px;color:#7e8a96}
+#footer{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 8px);left:0;right:0;text-align:center;font-size:10px;color:#59636e;letter-spacing:.1em;pointer-events:none}
 </style>
 </head>
 <body>
 <div id="wrap">
-<canvas id="c"></canvas>
-<div id="hud">
-  <div><div class="lbl">SCORE</div><div class="num" id="score">0</div></div>
-  <div style="text-align:right"><div class="lbl">BEST</div><div class="num" id="best">0</div></div>
-</div>
-<div id="overlay">
-  <div id="card">
-    <h1>GAP DOT</h1>
-    <p>流れてくるゲートの隙間を抜け続けよう。</p>
-    <p><b>タップで上昇</b><br>何もしないと下降</p>
-    <button id="start">START</button>
-    <p class="note">縦画面推奨</p>
+  <canvas id="c"></canvas>
+  <div id="hud">
+    <div><div class="lbl">SCORE</div><div class="num" id="score">0</div></div>
+    <div style="text-align:right"><div class="lbl">BEST</div><div class="num" id="best">0</div></div>
   </div>
+  <div id="overlay">
+    <div id="card">
+      <h1>WAVE GATE</h1>
+      <p>波のような軌跡を描きながら<br>流れてくるゲートの輪を抜けよう。</p>
+      <p><b>押している間は上向き</b><br>離すと下向き</p>
+      <button id="start">START</button>
+      <p class="note">糸通しっぽい操作感の試作版</p>
+    </div>
+  </div>
+  <div id="footer">PROTOTYPE 02</div>
 </div>
-</div>
-
 <script>
-(function(){
+(()=>{
 const wrap=document.getElementById('wrap');
-const c=document.getElementById('c');
-const ctx=c.getContext('2d');
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
 const overlay=document.getElementById('overlay');
+const card=document.getElementById('card');
 const startBtn=document.getElementById('start');
 const scoreEl=document.getElementById('score');
 const bestEl=document.getElementById('best');
 
-let W=0,H=0,dpr=1,running=false,last=0,score=0,best=0;
-let p,gates=[],spawn=0,speed=170,gap=160;
+let W=0,H=0,DPR=1;
+let running=false,last=0,pressing=false,score=0,best=0;
+let head,trail,gates=[];
+let spawnTimer=.8,speed=210;
 
-try{best=+(localStorage.getItem('gapdot_best')||0)}catch(e){}
+try{best=+(localStorage.getItem('wavegate_best')||0)}catch(e){}
 bestEl.textContent=best;
 
 function resize(){
-  W=innerWidth; H=innerHeight; dpr=Math.min(devicePixelRatio||1,2);
-  c.width=W*dpr; c.height=H*dpr;
-  ctx.setTransform(dpr,0,0,dpr,0,0);
+  W=innerWidth; H=innerHeight; DPR=Math.min(devicePixelRatio||1,2);
+  canvas.width=W*DPR; canvas.height=H*DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
 }
 addEventListener('resize',resize); resize();
 
 function reset(){
   score=0; scoreEl.textContent='0';
-  p={x:W*.28,y:H*.5,vy:0,r:8};
-  gates=[]; spawn=.45; speed=170; gap=Math.max(125,Math.min(175,H*.2));
+  speed=210;
+  head={x:W*0.24,y:H*0.5,vy:0,r:7};
+  trail=[];
+  for(let i=0;i<44;i++) trail.push({x:head.x-i*6,y:head.y});
+  gates=[];
+  spawnTimer=.9;
 }
+
 function startGame(e){
-  if(e && e.cancelable)e.preventDefault();
-  if(running)return;
-  reset(); running=true; overlay.style.display='none';
-  last=performance.now(); requestAnimationFrame(loop);
+  if(e && e.cancelable) e.preventDefault();
+  if(running) return;
+  reset();
+  running=true;
+  overlay.style.display='none';
+  last=performance.now();
+  requestAnimationFrame(loop);
 }
-function flap(e){
-  if(e && e.cancelable)e.preventDefault();
-  if(!running)return;
-  p.vy=-320;
+
+function setPress(v,e){
+  if(e && e.cancelable) e.preventDefault();
+  pressing=v;
 }
+
 function makeGate(){
-  const min=120+gap/2,max=H-80-gap/2;
-  const cy=min+Math.random()*Math.max(10,max-min);
-  gates.push({x:W+30,w:26,cy:cy,passed:false});
+  const gapH=Math.max(112, 160 - score*1.1);
+  const margin=110;
+  const cy=margin + Math.random() * Math.max(20, H-margin*2);
+  gates.push({x:W+70, w:44, cy, gapH, passed:false});
 }
-function collide(g){
-  if(p.x+p.r<g.x||p.x-p.r>g.x+g.w)return false;
-  return p.y-p.r<g.cy-gap/2 || p.y+p.r>g.cy+gap/2;
+
+function collideGate(g){
+  const ringOuterX = g.x;
+  const ringInnerTop = g.cy - g.gapH/2;
+  const ringInnerBottom = g.cy + g.gapH/2;
+  if(head.x + head.r < ringOuterX || head.x - head.r > ringOuterX + g.w) return false;
+  if(head.y - head.r > ringInnerTop && head.y + head.r < ringInnerBottom) return false;
+  return true;
 }
+
 function gameOver(){
   running=false;
-  best=Math.max(best,score); bestEl.textContent=best;
-  try{localStorage.setItem('gapdot_best',best)}catch(e){}
+  pressing=false;
+  best=Math.max(best, score);
+  bestEl.textContent=best;
+  try{localStorage.setItem('wavegate_best', best)}catch(e){}
   overlay.style.display='flex';
-  document.getElementById('card').innerHTML=
-   '<div class="lbl">GAME OVER</div><div style="font-size:56px;font-weight:900;margin:6px 0">'+score+
-   '</div><p>BEST '+best+'</p><button id="retry">RETRY</button><p class="note">タップで上昇</p>';
-  const retry=document.getElementById('retry');
-  retry.addEventListener('click',function(e){e.stopPropagation();startGame(e)});
+  card.innerHTML = '<div class="lbl">GAME OVER</div>'+
+    '<div style="font-size:56px;font-weight:900;margin:8px 0 4px">'+score+'</div>'+
+    '<p>BEST '+best+'</p>'+
+    '<button id="retry">RETRY</button>'+
+    '<p class="note">押して上へ、離して下へ</p>';
+  document.getElementById('retry').addEventListener('click', startGame);
 }
+
 function update(dt){
-  p.vy+=850*dt; p.y+=p.vy*dt;
-  spawn-=dt;
-  if(spawn<=0){makeGate(); spawn=Math.max(.86,1.18-score*.008);}
-  speed=Math.min(270,170+score*2.3);
-  gap=Math.max(115,Math.max(125,Math.min(175,H*.2))-score*.9);
-  for(const g of gates){
-    g.x-=speed*dt;
-    if(!g.passed && g.x+g.w<p.x){g.passed=true;score++;scoreEl.textContent=score}
-    if(collide(g))return gameOver();
+  const accel = pressing ? -780 : 580;
+  head.vy += accel * dt;
+  head.vy *= 0.985;
+  const maxVy = 250;
+  if(head.vy > maxVy) head.vy = maxVy;
+  if(head.vy < -maxVy) head.vy = -maxVy;
+  head.y += head.vy * dt;
+
+  trail.unshift({x:head.x,y:head.y});
+  while(trail.length > 56) trail.pop();
+  for(let i=1;i<trail.length;i++){
+    const prev=trail[i-1], cur=trail[i];
+    cur.x += (prev.x - 6 - cur.x)*0.52;
+    cur.y += (prev.y - cur.y)*0.35;
   }
-  gates=gates.filter(g=>g.x+g.w>-40);
-  if(p.y-p.r<80||p.y+p.r>H-45)return gameOver();
+
+  spawnTimer -= dt;
+  if(spawnTimer <= 0){
+    makeGate();
+    spawnTimer = Math.max(0.85, 1.18 - score*0.006);
+  }
+
+  speed = Math.min(320, 210 + score*2.2);
+  for(const g of gates){
+    g.x -= speed*dt;
+    if(!g.passed && g.x + g.w < head.x){
+      g.passed = true;
+      score++;
+      scoreEl.textContent = score;
+    }
+    if(collideGate(g)) return gameOver();
+  }
+  gates = gates.filter(g => g.x + g.w > -80);
+
+  if(head.y < 72 || head.y > H-42) return gameOver();
 }
+
+function drawTrail(){
+  if(trail.length < 2) return;
+  ctx.lineCap='round';
+  ctx.lineJoin='round';
+
+  ctx.strokeStyle='rgba(255,255,255,.12)';
+  ctx.lineWidth=16;
+  ctx.beginPath();
+  ctx.moveTo(trail[0].x, trail[0].y);
+  for(let i=1;i<trail.length-2;i++){
+    const xc=(trail[i].x + trail[i+1].x)/2;
+    const yc=(trail[i].y + trail[i+1].y)/2;
+    ctx.quadraticCurveTo(trail[i].x, trail[i].y, xc, yc);
+  }
+  ctx.stroke();
+
+  ctx.strokeStyle='rgba(255,255,255,.95)';
+  ctx.lineWidth=4;
+  ctx.beginPath();
+  ctx.moveTo(trail[0].x, trail[0].y);
+  for(let i=1;i<trail.length-2;i++){
+    const xc=(trail[i].x + trail[i+1].x)/2;
+    const yc=(trail[i].y + trail[i+1].y)/2;
+    ctx.quadraticCurveTo(trail[i].x, trail[i].y, xc, yc);
+  }
+  ctx.stroke();
+}
+
+function drawGate(g){
+  const outerTop = 0;
+  const outerBottom = H;
+  const innerTop = g.cy - g.gapH/2;
+  const innerBottom = g.cy + g.gapH/2;
+
+  ctx.fillStyle='#394552';
+  ctx.fillRect(g.x, outerTop, g.w, innerTop-outerTop);
+  ctx.fillRect(g.x, innerBottom, g.w, outerBottom-innerBottom);
+
+  ctx.fillStyle='#90a0af';
+  ctx.fillRect(g.x-7, innerTop-8, g.w+14, 8);
+  ctx.fillRect(g.x-7, innerBottom, g.w+14, 8);
+
+  ctx.fillStyle='rgba(10,14,18,.85)';
+  ctx.fillRect(g.x+8, innerTop, g.w-16, g.gapH);
+
+  ctx.strokeStyle='rgba(255,255,255,.10)';
+  ctx.strokeRect(g.x+.5, .5, g.w-1, innerTop-1);
+  ctx.strokeRect(g.x+.5, innerBottom+.5, g.w-1, H-innerBottom-1);
+}
+
 function draw(){
   ctx.clearRect(0,0,W,H);
-  ctx.strokeStyle='rgba(255,255,255,.035)';
-  for(let x=0;x<W;x+=28){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
-  for(let y=0;y<H;y+=28){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
-  for(const g of gates){
-    const a=g.cy-gap/2,b=g.cy+gap/2;
-    ctx.fillStyle='#36414c'; ctx.fillRect(g.x,0,g.w,a); ctx.fillRect(g.x,b,g.w,H-b);
-    ctx.fillStyle='#83909c'; ctx.fillRect(g.x-5,a-5,g.w+10,5); ctx.fillRect(g.x-5,b,g.w+10,5);
-  }
-  if(p){
-    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
-  }
+
+  ctx.strokeStyle='rgba(255,255,255,.03)';
+  ctx.lineWidth=1;
+  for(let x=0;x<W;x+=28){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=28){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+  ctx.setLineDash([3,9]);
+  ctx.strokeStyle='rgba(255,255,255,.05)';
+  ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+  ctx.setLineDash([]);
+
+  for(const g of gates) drawGate(g);
+  drawTrail();
+
+  const glow=ctx.createRadialGradient(head.x,head.y,1,head.x,head.y,18);
+  glow.addColorStop(0,'rgba(255,255,255,.35)');
+  glow.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=glow;
+  ctx.beginPath(); ctx.arc(head.x,head.y,18,0,Math.PI*2); ctx.fill();
+
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.arc(head.x,head.y,head.r,0,Math.PI*2); ctx.fill();
 }
+
 function loop(now){
-  if(!running){draw();return}
-  const dt=Math.min((now-last)/1000,.033); last=now;
-  update(dt); draw();
-  if(running)requestAnimationFrame(loop);
+  if(!running){draw();return;}
+  const dt = Math.min((now-last)/1000, .033);
+  last = now;
+  update(dt);
+  draw();
+  if(running) requestAnimationFrame(loop);
 }
 
-startBtn.addEventListener('click',startGame);
-overlay.addEventListener('click',function(e){
-  if(e.target===overlay) startGame(e);
-});
-wrap.addEventListener('pointerdown',function(e){
-  if(running)flap(e);
-},{passive:false});
+startBtn.addEventListener('click', startGame);
+overlay.addEventListener('click', (e)=>{ if(e.target===overlay) startGame(e); });
+wrap.addEventListener('pointerdown', (e)=> setPress(true,e), {passive:false});
+wrap.addEventListener('pointerup', (e)=> setPress(false,e), {passive:false});
+wrap.addEventListener('pointercancel', (e)=> setPress(false,e), {passive:false});
+wrap.addEventListener('pointerleave', (e)=> setPress(false,e), {passive:false});
 
-reset(); draw();
+reset();
+draw();
 })();
 </script>
 </body>
