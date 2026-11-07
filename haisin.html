@@ -133,6 +133,7 @@ mark{background:#ffe066;color:inherit;border-radius:3px;padding:0 1px}
 .error{background:#fee4e2;color:#b42318;padding:12px;border-radius:10px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(80px);background:#1d2433;color:#fff;padding:10px 18px;border-radius:999px;font-size:.9rem;transition:transform .2s;z-index:9}
 .toast.show{transform:translateX(-50%) translateY(0)}
+.game.hiddenrow{box-shadow:none;background:transparent;border:1px dashed var(--line)}
 .back{display:inline-block;margin-bottom:10px;font-size:.9rem}
 footer{text-align:center;color:var(--sub);font-size:.8rem;padding:20px}
 
@@ -188,6 +189,7 @@ const SITE_VERSION = 'v1.1.0';
 // アーカイブ動画の対応表（スプレッドシートの「アーカイブ」タブ）
 const SHEET_ID = '1Vn-LSQZHBdbfnjMfHDGD4Lqr30egE46MEQFrptIZRFc';
 const ARCHIVE_TAB = 'アーカイブ';
+const HIDDEN_TAB = '非表示';     // ここに書いたプログラマIDの人はサイトに表示しない（作品数には含める）
 
 // 配信日(JST, YYYY-MM-DD) → YouTube動画ID
 // ※予備用。スプレッドシートの「アーカイブ」タブが読めればそちらが優先されます
@@ -526,45 +528,62 @@ function loadJSONP(){
   });
 }
 
-// 「アーカイブ」タブを読み込む（Google Visualization API の JSONP）。失敗しても null を返すだけ
-function loadArchiveTab(){
+// スプレッドシートのタブを読み込む（Google Visualization API の JSONP）
+// 成功：{ labels, rows: [[値...], ...] } ／ 失敗：null
+function loadTab(name){
   return new Promise(resolve => {
-    const cb = 'arc_' + Date.now();
+    const cb = 'tab_' + Math.random().toString(36).slice(2);
     const sc = document.createElement('script');
     const timer = setTimeout(() => { cleanup(); resolve(null); }, 15000);
     function cleanup(){ clearTimeout(timer); delete window[cb]; sc.remove(); }
     window[cb] = res => {
       cleanup();
-      try {
-        if (res.status !== 'ok') return resolve(null);
-        const labels = res.table.cols.map(c => String(c.label || '').trim());
-        const iDate = labels.findIndex(l => l.includes('配信日'));
-        const iNo = labels.findIndex(l => l.includes('配信No'));
-        const iUrl = labels.findIndex(l => /URL|動画/i.test(l));
-        const byDate = {}, byNo = {};
-        for (const r of res.table.rows){
-          const c = r.c || [];
-          const id = ytId(c[iUrl]?.v);
-          if (!id) continue;
-          const dv = c[iDate]?.v;
-          let key = null;
-          const m = typeof dv === 'string' && dv.match(/Date\((\d+),(\d+),(\d+)/);
-          if (m) key = `${m[1]}-${pad(+m[2] + 1)}-${pad(m[3])}`;
-          else if (dv){ const t = String(dv).match(/(\d{4})\D(\d{1,2})\D(\d{1,2})/); if (t) key = `${t[1]}-${pad(t[2])}-${pad(t[3])}`; }
-          if (key) (byDate[key] ||= []).includes(id) || byDate[key].push(id);
-          const no = c[iNo]?.v;
-          if (typeof no === 'number') (byNo[no] ||= []).includes(id) || byNo[no].push(id);
-        }
-        resolve({ byDate, byNo });
-      } catch { resolve(null); }
+      if (!res || res.status !== 'ok' || !res.table) return resolve(null);
+      resolve({
+        labels: res.table.cols.map(c => String(c.label || '').trim()),
+        rows: res.table.rows.map(r => (r.c || []).map(x => x ? x.v : null)),
+      });
     };
     sc.onerror = () => { cleanup(); resolve(null); };
-    sc.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cb}&headers=1&sheet=${encodeURIComponent(ARCHIVE_TAB)}&t=${Date.now()}`;
+    sc.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cb}&headers=1&sheet=${encodeURIComponent(name)}&t=${Date.now()}`;
     document.body.appendChild(sc);
   });
 }
 
-function build(data, arc){
+// 「アーカイブ」タブ → 配信日 / 配信No. ごとの動画ID
+function parseArchive(tab){
+  if (!tab) return null;
+  const iDate = tab.labels.findIndex(l => l.includes('配信日'));
+  const iNo = tab.labels.findIndex(l => l.includes('配信No'));
+  const iUrl = tab.labels.findIndex(l => /URL|動画/i.test(l));
+  const byDate = {}, byNo = {};
+  for (const c of tab.rows){
+    const id = ytId(c[iUrl]);
+    if (!id) continue;
+    const dv = c[iDate];
+    let key = null;
+    const m = typeof dv === 'string' && dv.match(/Date\((\d+),(\d+),(\d+)/);
+    if (m) key = `${m[1]}-${pad(+m[2] + 1)}-${pad(m[3])}`;
+    else if (dv){ const t = String(dv).match(/(\d{4})\D(\d{1,2})\D(\d{1,2})/); if (t) key = `${t[1]}-${pad(t[2])}-${pad(t[3])}`; }
+    if (key) (byDate[key] ||= []).includes(id) || byDate[key].push(id);
+    const no = c[iNo];
+    if (typeof no === 'number') (byNo[no] ||= []).includes(id) || byNo[no].push(id);
+  }
+  return { byDate, byNo };
+}
+
+// プログラマIDの比較用（空白・全角半角・大小文字の違いを無視）
+const idKey = s => String(s ?? '').normalize('NFKC').toUpperCase().replace(/\s+/g, '');
+
+// 「非表示」タブ → 非表示にするプログラマIDの集合
+function parseHidden(tab){
+  const set = new Set();
+  const i = Math.max(0, tab.labels.findIndex(l => l.includes('ID')));
+  for (const c of tab.rows){ const k = idKey(c[i]); if (k) set.add(k); }
+  return set;
+}
+
+function build(data, arc, hidden){
   const [head, ...body] = data.values;
   const col = name => head.findIndex(h => String(h).trim() === name);
   const C = {
@@ -590,6 +609,7 @@ function build(data, arc){
       url: C.url >= 0 ? ytId(r[C.url]) : null,
     };
     row.pkey = row.pid || ('name:' + row.pname);
+    row.hidden = !!row.pid && hidden.has(idKey(row.pid));
     row.search = norm(row.gname + ' ' + row.pname + ' ' + row.gid + ' ' + row.pid);
     DB.rows.push(row);
 
@@ -608,7 +628,7 @@ function build(data, arc){
 
     // プログラマ
     let p = DB.progs.get(row.pkey);
-    if (!p){ p = { id: row.pkey, pid: row.pid, names: new Map(), games: [], streams: new Set() }; DB.progs.set(row.pkey, p); }
+    if (!p){ p = { id: row.pkey, pid: row.pid, hidden: row.hidden, names: new Map(), games: [], streams: new Set() }; DB.progs.set(row.pkey, p); }
     p.games.push(row);
     p.streams.add(st);
     p.names.set(row.pname, (p.names.get(row.pname) || 0) + 1);
@@ -631,7 +651,9 @@ function build(data, arc){
     p.last = p.games[p.games.length - 1].stream;
     p.search = norm(p.allNames.join(' ') + ' ' + p.pid);
   }
-  DB.progList = [...DB.progs.values()].sort((a,b) => b.games.length - a.games.length || a.first.idx - b.first.idx);
+  // 非表示のプログラマは数（作品数・配信の作品数・プログラマ数）には含めるが、一覧・検索・個別ページには出さない
+  DB.visRows = DB.rows.filter(g => !g.hidden);
+  DB.progList = [...DB.progs.values()].filter(p => !p.hidden).sort((a,b) => b.games.length - a.games.length || a.first.idx - b.first.idx);
   DB.progList.forEach((p,i) => p.rank = i + 1);
 }
 
@@ -731,7 +753,7 @@ function viewHome(){
   renderPick();
 }
 function renderPick(){
-  const g = DB.rows[Math.floor(Math.random() * DB.rows.length)];
+  const g = DB.visRows[Math.floor(Math.random() * DB.visRows.length)];
   const p = DB.progs.get(g.pkey), s = g.stream;
   $('#pick').innerHTML = `<div class="pick">${avatar(p)}
     <div style="flex:1;min-width:200px"><div class="big">${esc(g.gname)}</div>
@@ -748,7 +770,7 @@ function homeSearch(q){
   const terms = parseTerms(q), nterms = terms.map(norm);
   if (!terms.length){ res.innerHTML = ''; return; }
   const progs = DB.progList.filter(p => matchAll(p.search, nterms));
-  const games = DB.rows.filter(g => matchAll(g.search, nterms));
+  const games = DB.visRows.filter(g => matchAll(g.search, nterms));
   res.innerHTML = `<p class="muted" style="margin:12px 0 8px">プログラマ ${progs.length}人 ・ ゲーム ${games.length}件</p>`;
   if (progs.length){
     res.insertAdjacentHTML('beforeend', '<h2 style="margin-top:8px">👤 プログラマ</h2>');
@@ -804,7 +826,9 @@ function viewStream(key){
       </div>
     </div>
     <h2>🎮 プレイしたゲーム（プレイ順）</h2>
-    <div class="games">${s.games.map((g, k) => gameRow(g, {showStream:false}).replace('<div class="main">', `<div class="no">${k+1}</div><div class="main">`)).join('')}</div>
+    <div class="games">${s.games.map((g, k) => g.hidden
+      ? `<div class="game hiddenrow"><div class="no">${k+1}</div><div class="main muted">🔒 非公開の作品</div></div>`
+      : gameRow(g, {showStream:false}).replace('<div class="main">', `<div class="no">${k+1}</div><div class="main">`)).join('')}</div>
     <p style="display:flex;justify-content:space-between;margin-top:20px">
       <span>${prev ? `<a href="${streamLink(prev)}">← ${esc(streamTitle(prev))}</a>` : ''}</span>
       <span>${next ? `<a href="${streamLink(next)}">${esc(streamTitle(next))} →</a>` : ''}</span>
@@ -812,7 +836,7 @@ function viewStream(key){
 }
 
 function viewProgrammers(){
-  app.innerHTML = `<h2>👤 プログラマ一覧 <span class="muted">${DB.progs.size}人</span></h2>
+  app.innerHTML = `<h2>👤 プログラマ一覧 <span class="muted">${DB.progList.length}人</span></h2>
     <div class="search" style="margin-bottom:10px"><input id="pq" type="search" placeholder="名前・プログラマIDで絞り込み（過去の名前でもOK）" autocomplete="off"></div>
     <div class="chips" id="psort">
       <button class="chip on" data-s="count">作品数順</button>
@@ -843,7 +867,7 @@ function viewProgrammers(){
 
 function viewProgrammer(id){
   const p = DB.progs.get(id);
-  if (!p) return notFound();
+  if (!p || p.hidden) return notFound();
   const streams = [...p.streams].sort((a,b) => a.idx - b.idx);
   const others = p.allNames.filter(n => n !== p.name);
   const url = location.href;
@@ -901,7 +925,7 @@ function viewGames(){
   }
   function draw(){
     const terms = parseTerms($('#gq').value), nterms = terms.map(norm);
-    list = DB.rows.filter(g => matchAll(g.search, nterms));
+    list = DB.visRows.filter(g => matchAll(g.search, nterms));
     list.sort((a,b) => {
       const x = keyOf(a, sortK), y = keyOf(b, sortK);
       const c = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'ja');
@@ -937,7 +961,7 @@ function barsHTML(entries){
 
 function viewRanking(){
   const top = DB.progList.slice(0, 20);
-  const byStreams = [...DB.progs.values()].sort((a,b) => b.streams.size - a.streams.size).slice(0, 10);
+  const byStreams = DB.progList.slice().sort((a,b) => b.streams.size - a.streams.size).slice(0, 10);
   const yearGames = {}, yearStreams = {}, yearNew = {};
   for (const s of DB.streams){ const y = s.date?.slice(0,4); if (!y) continue; yearGames[y] = (yearGames[y]||0) + s.games.length; yearStreams[y] = (yearStreams[y]||0) + 1; }
   for (const p of DB.progs.values()){ const y = p.first.date?.slice(0,4); if (y) yearNew[y] = (yearNew[y]||0) + 1; }
@@ -990,10 +1014,13 @@ document.addEventListener('click', async e => {
 
 (async () => {
   try {
-    const [data, arc] = await Promise.all([loadJSONP(), loadArchiveTab()]);
+    const [data, arcTab, hidTab] = await Promise.all([loadJSONP(), loadTab(ARCHIVE_TAB), loadTab(HIDDEN_TAB)]);
     if (!data?.values?.length) throw new Error('データが空です');
-    if (!arc) console.warn('アーカイブタブを読み込めなかったため、埋め込みの対応表を使います');
-    build(data, arc);
+    if (!arcTab) console.warn('アーカイブタブを読み込めなかったため、埋め込みの対応表を使います');
+    // 非表示リストが読めないときは、非表示の人を誤って表示しないように表示を止める
+    const hid = hidTab || await loadTab(HIDDEN_TAB);
+    if (!hid) throw new Error('データの一部を読み込めませんでした');
+    build(data, parseArchive(arcTab), parseHidden(hid));
     $('#upd').textContent = `最終更新 ${DB.updated} ・ ${SITE_VERSION}`;
     window.addEventListener('hashchange', route);
     route();
