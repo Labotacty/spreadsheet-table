@@ -1,481 +1,963 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>たくらぼ配信データベース</title>
-    <style>
-        /* テーブルをスクロール可能にするコンテナ */
-        .table-container {
-            width: 100%;
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            max-height: 80vh; /* 画面の80%の高さで制限 */
-            border: 1px solid #ddd;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>たくらぼ はじプロ配信アーカイブ</title>
+<meta name="description" content="たくらぼのはじプロ配信でプレイした、みんなの作ったゲームのデータベース。自分のゲームがいつの配信で遊ばれたか探せます。">
+<meta property="og:title" content="たくらぼ はじプロ配信アーカイブ">
+<meta property="og:description" content="自分のゲームがいつの配信で遊ばれたか探してみよう！">
+<style>
+:root{
+  --bg:#f6f7fb; --card:#fff; --ink:#1d2433; --sub:#667085; --line:#e4e7ee;
+  --main:#e8382f; --main2:#1f8fe0; --accent:#1f78d1; --good:#12b76a;
+  --yellow:#ffd60a; --navy:#1d2a5a;
+  --radius:14px; --shadow:0 2px 10px rgba(20,30,60,.07);
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#12151c;--card:#1b2029;--ink:#e8ebf2;--sub:#98a2b3;--line:#2b3240;--shadow:0 2px 10px rgba(0,0,0,.3)}
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;line-height:1.6}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+button{font:inherit;cursor:pointer}
 
-        /* テーブルのスタイル */
-        table {
-            width: 100%;
-            min-width: 600px;
-            border-collapse: collapse; /* 罫線を確実に適用 */
-            font-family: Arial, sans-serif;
-            empty-cells: show; /* 空セルの罫線を表示 */
-        }
+/* header */
+header{background:var(--yellow) radial-gradient(rgba(29,42,90,.10) 1.5px,transparent 1.6px) 0 0/16px 16px;color:var(--navy);padding:18px 16px 0;border-bottom:4px solid var(--navy)}
+.head-inner{max-width:1100px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.brand h1{margin:0;font-size:1.35rem;letter-spacing:.02em}
+.brand h1 a{color:var(--navy)}
+.brand .upd{margin-left:auto;font-size:.75rem;opacity:.75;font-weight:600}
+nav{display:flex;gap:4px;margin-top:14px;overflow-x:auto;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav a{color:var(--navy);padding:9px 14px;border-radius:10px 10px 0 0;white-space:nowrap;font-weight:700;font-size:.95rem;opacity:.7}
+nav a:hover{text-decoration:none;opacity:1}
+nav a.on{background:var(--navy);color:var(--yellow);opacity:1}
 
-        html {
-            -webkit-text-size-adjust: 100%;
-            text-size-adjust: 100%;
-        }
+main{max-width:1100px;margin:0 auto;padding:18px 14px 60px}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
+h2{font-size:1.15rem;margin:26px 0 12px}
+h2:first-child{margin-top:4px}
+.muted{color:var(--sub);font-size:.85rem}
 
-        th, td {
-            border: 1px solid #ddd;
-            padding: 12px;
-            text-align: left;
-            white-space: nowrap;
-            font-size: 16px;
-            min-height: 20px; /* 空セルでも高さを確保 */
-        }
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.stat{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;text-align:center}
+.stat b{display:block;font-size:1.7rem;color:var(--main);line-height:1.2}
+.stat span{font-size:.8rem;color:var(--sub)}
+@media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}}
 
-        /* ヘッダーの固定 */
-        thead {
-            position: sticky;
-            top: 0;
-            background-color: #4CAF50;
-            color: white;
-            z-index: 2;
-        }
+/* search */
+.search{position:relative}
+.search input{width:100%;font-size:1.05rem;padding:14px 16px 14px 44px;border:2px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);outline:none}
+.search input:focus{border-color:var(--main)}
+.search::before{content:"🔍";position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:1rem}
+.hero{padding:22px 18px;margin-top:14px}
+.hero p{margin:0 0 12px;font-weight:600}
 
-        thead tr {
-            cursor: pointer; /* ソート可能 */
-        }
+/* lists */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.stream{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;color:inherit;transition:transform .12s}
+.stream:hover{transform:translateY(-2px);text-decoration:none}
+.thumb{aspect-ratio:16/9;background:var(--yellow);display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:800;color:var(--navy);position:relative;overflow:hidden}
+.thumb img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
+.thumb .num{position:absolute;left:8px;top:8px;background:var(--main);color:#fff;font-size:.95rem;padding:1px 10px;border-radius:8px;font-weight:800;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.thumb .badge{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.72);color:#fff;font-size:.75rem;padding:2px 8px;border-radius:6px;font-weight:600}
+.stream .body{padding:10px 12px}
+.stream .ttl{font-weight:700}
+.tag{display:inline-block;font-size:.72rem;padding:1px 8px;border-radius:999px;background:var(--main);color:#fff;font-weight:700;vertical-align:2px;margin-right:4px}
+.tag.sp{background:#9b51e0}
 
-        /* ソート済みの列をハイライト */
-        th.sorted {
-            background-color: #ffcc80 !important;
-        }
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 14px}
+.chip{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:5px 12px;border-radius:999px;font-size:.85rem}
+.chip.on{background:var(--main);border-color:var(--main);color:#fff}
 
-        /* スクロールバーのデザイン */
-        .table-container::-webkit-scrollbar {
-            height: 8px;
-        }
-        .table-container::-webkit-scrollbar-thumb {
-            background: #888;
-            border-radius: 4px;
-        }
-        .table-container::-webkit-scrollbar-track {
-            background: #f1f1f1;
-        }
+/* game rows */
+.games{display:flex;flex-direction:column;gap:8px}
+.game{background:var(--card);border-radius:12px;box-shadow:var(--shadow);padding:10px 14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.game .no{color:var(--sub);font-size:.8rem;min-width:2.6em;text-align:right}
+.game .main{flex:1;min-width:180px}
+.game .gname{font-weight:700;word-break:break-all}
+.game .by{font-size:.85rem;color:var(--sub)}
+.game .side{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.85rem}
+.gid{font-family:ui-monospace,Consolas,monospace;font-size:.82rem;border:1px dashed var(--line);border-radius:8px;padding:3px 8px;background:transparent;color:var(--ink);white-space:nowrap}
+.gid:hover{border-color:var(--main)}
+.gid.copied{border-color:var(--good);color:var(--good)}
+.yt{background:#ff0033;color:#fff!important;border-radius:8px;padding:3px 10px;font-size:.8rem;font-weight:700;white-space:nowrap}
+.yt:hover{text-decoration:none;opacity:.85}
+mark{background:#ffe066;color:inherit;border-radius:3px;padding:0 1px}
 
-        /* 奇数行の背景色 */
-        tbody tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
+/* programmer */
+.prow{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:12px;box-shadow:var(--shadow);padding:10px 14px;color:inherit}
+.prow:hover{text-decoration:none;outline:2px solid var(--main)}
+.avatar{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;flex-shrink:0;font-size:1.1rem}
+.prow .nm{font-weight:700;word-break:break-all}
+.prow .cnt{margin-left:auto;text-align:right;font-weight:800;color:var(--main);white-space:nowrap}
+.prow .cnt small{display:block;font-weight:400;color:var(--sub);font-size:.72rem}
+.rank{width:2em;text-align:center;font-weight:800;color:var(--sub)}
+.rank.r1{color:#f5b400}.rank.r2{color:#9aa4b2}.rank.r3{color:#cd7f32}
 
-        /* ホバー時の色 */
-        tbody tr:hover {
-            background-color: #f1f1f1;
-        }
+.profile{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.profile .avatar{width:64px;height:64px;font-size:1.6rem}
+.profile h2{margin:0}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:14px}
+.kv div{background:var(--bg);border-radius:10px;padding:10px;text-align:center}
+.kv b{display:block;font-size:1.2rem}
+.kv span{font-size:.75rem;color:var(--sub)}
+.share{display:inline-flex;align-items:center;gap:6px;background:#000;color:#fff!important;border-radius:999px;padding:6px 14px;font-size:.85rem;font-weight:700}
+.share:hover{text-decoration:none;opacity:.85}
+.btn{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 14px;color:var(--ink);font-size:.85rem}
+.btn:hover{border-color:var(--main)}
+.btn.primary{background:var(--main);border-color:var(--main);color:#fff;font-weight:700}
 
-        /* ソート用のアイコン */
-        .sort-icon {
-            margin-left: 8px;
-            font-size: 12px;
-        }
+/* bars */
+.bars{display:flex;flex-direction:column;gap:6px}
+.bar{display:grid;grid-template-columns:4.5em 1fr 4em;gap:8px;align-items:center;font-size:.85rem}
+.bar .track{background:var(--bg);border-radius:6px;height:20px;overflow:hidden}
+.bar .fill{height:100%;background:linear-gradient(90deg,var(--main),var(--main2));border-radius:6px}
+.bar .v{text-align:right;color:var(--sub)}
 
-        /* スマホ対応 */
-        @media (max-width: 600px) {
-            th, td {
-                padding: 10px;
-                font-size: 14px;
-            }
-        }
+.pick{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.pick .big{font-size:1.3rem;font-weight:800;word-break:break-all}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:760px){.two{grid-template-columns:1fr}}
 
-        /* 検索ボックスのスタイル */
-        #searchInput {
-            width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
-            font-size: 16px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
+.more{display:block;margin:16px auto 0}
+.empty{text-align:center;color:var(--sub);padding:30px}
+.loading{text-align:center;padding:60px;color:var(--sub)}
+.spinner{width:36px;height:36px;border:4px solid var(--line);border-top-color:var(--main);border-radius:50%;animation:sp 1s linear infinite;margin:0 auto 12px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.error{background:#fee4e2;color:#b42318;padding:12px;border-radius:10px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(80px);background:#1d2433;color:#fff;padding:10px 18px;border-radius:999px;font-size:.9rem;transition:transform .2s;z-index:9}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.back{display:inline-block;margin-bottom:10px;font-size:.9rem}
+footer{text-align:center;color:var(--sub);font-size:.8rem;padding:20px}
 
-        .highlight {
-            background-color: yellow;
-            font-weight: bold;
-        }
-        
-        /* ページタイトルのスタイル */
-        #pageTitle {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 1.5rem;
-            padding: 10px 20px;
-            margin: 0;
-            background-color: #4CAF50;
-            color: white;
-            flex-wrap: wrap; /* スマホで改行しても収まるように */
-        }
+/* table view */
+.tablewrap{overflow-x:auto;background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:var(--card);cursor:pointer;user-select:none}
+th.on{color:var(--main)}
+td.wrap{white-space:normal;min-width:200px}
 
-        #updateInfo {
-            font-size: 0.9rem;
-            color: #f9f9f9;
-            white-space: nowrap; /* 更新日時とバージョンは改行しない */
-            margin-left: 10px;
-        }
-
-        /* 画面幅が狭い場合でもタイトルが収まるように調整 */
-        @media (max-width: 600px) {
-            #pageTitle {
-                font-size: 1.1rem; /* フォントサイズを少し小さく */
-            }
-            #updateInfo {
-                font-size: 0.5rem; /* 更新日時とバージョンのフォントサイズも調整 */
-                margin-top: 5px; /* スマホでは少し下に余白をつける */
-                text-align: center; /* スマホでは中央揃え */
-                width: 100%; /* 幅を100%にして表示させる */
-            }
-        }
-        
-        /* エラーメッセージスタイル */
-        .error-message {
-            color: red;
-            background-color: #ffeeee;
-            padding: 10px;
-            border: 1px solid red;
-            margin: 10px 0;
-        }
-    </style>
+@media(max-width:640px){
+  .brand h1{font-size:1.05rem}
+  .brand .upd{font-size:.68rem;width:100%;margin-left:0}
+  .grid{grid-template-columns:1fr 1fr;gap:8px}
+  .thumb{font-size:1.4rem}
+  .stream .body{padding:8px 10px;font-size:.88rem}
+  .kv{grid-template-columns:repeat(3,1fr);gap:6px}
+  .kv b{font-size:1rem}
+  .kv span{font-size:.68rem}
+  .stat b{font-size:1.4rem}
+}
+</style>
 </head>
 <body>
-
-    <h1 id="pageTitle">
-        たくらぼ配信でプレイしたゲームリスト
-        <span id="updateInfo">読み込み中...</span>
-    </h1>
-    
-    <p>
-        <a href="https://www.youtube.com/playlist?list=PLKffMDfIWsbbXZXSjrkkiFI1pk-sGPN4F" target="_blank">
-            📺 再生リストを見る
-        </a>
-    </p>
-    
-    <!-- エラーメッセージ表示領域 -->
-    <div id="errorArea"></div>
-    
-    <!-- 検索フィルター -->
-    <input type="text" id="searchInput" placeholder="検索..." onkeyup="filterTable()">
-    <p id="resultCount">🔍 検索結果: 0 件</p>
-
-    <div class="table-container">
-        <table id="sheetTable">
-            <thead>
-                <tr id="tableHeader"></tr>
-            </thead>
-            <tbody id="tableBody"></tbody>
-        </table>
+<header>
+  <div class="head-inner">
+    <div class="brand">
+      <h1><a href="#/">🎮 たくらぼ はじプロ配信アーカイブ</a></h1>
+      <span class="upd" id="upd">読み込み中…</span>
     </div>
+    <nav id="nav">
+      <a href="#/" data-r="">ホーム</a>
+      <a href="#/streams" data-r="streams">配信回</a>
+      <a href="#/programmers" data-r="programmers">プログラマ</a>
+      <a href="#/games" data-r="games">ゲーム一覧</a>
+      <a href="#/ranking" data-r="ranking">ランキング</a>
+    </nav>
+  </div>
+</header>
+<main id="app"><div class="loading"><div class="spinner"></div>データを読み込んでいます…</div></main>
+<footer>
+  <a href="https://www.youtube.com/playlist?list=PLKffMDfIWsbbXZXSjrkkiFI1pk-sGPN4F" target="_blank" rel="noopener">📺 YouTube再生リスト</a>
+  ・ データは配信でプレイした記録をもとにしています
+</footer>
+<div class="toast" id="toast"></div>
 
-    <script>
-        // ==========================================
-        // ======== 正しいURL設定が最重要 ===========
-        // ==========================================
-        const webAppUrl = 'https://script.google.com/macros/s/AKfycbxXHfQ7WI3hSQrItJyG-iBn6IItql81YUNMu_rayyKe4gBDkl_ijrxyutGOEQZV2j_F/exec';
-        const version = "v0.1.0"; // バージョン更新
-        
-        let tableData = []; // データ保存用
-        let sortOrder = {}; // ソート状態
-        const unsortableColumns = [6]; // ソート不可の列（6番目のID列）
-        
-        // エラーメッセージ表示
-        function showError(message) {
-            const errorArea = document.getElementById('errorArea');
-            errorArea.innerHTML = `<div class="error-message">${message}</div>`;
-            console.error(message);
-        }
-        
-        // データ取得関数 - シンプルバージョンのコードをベースに再構築
-        function loadDataWithJSONP() {
-            console.log("JSONPでデータ読み込み開始");
-            document.getElementById('updateInfo').textContent = "データを取得中...";
-            
-            // 一意のコールバック関数名を生成
-            const callbackName = 'jsonpCallback_' + new Date().getTime();
-            
-            // グローバルにコールバック関数を定義
-            window[callbackName] = function(data) {
-                console.log("データ受信成功");
-                
-                try {
-                    if (!data || !data.values || data.values.length === 0) {
-                        throw new Error("データが空または無効です");
-                    }
-                    
-                    // タイムスタンプ処理
-                    let updatedTime;
-                    if (data.timestamp) {
-                        try {
-                            const date = new Date(data.timestamp);
-                            if (!isNaN(date.getTime())) {
-                                updatedTime = formatDate(date);
-                            } else {
-                                updatedTime = data.timestamp;
-                            }
-                        } catch (e) {
-                            updatedTime = data.timestamp;
-                        }
-                    } else {
-                        updatedTime = formatDate(new Date()) + " (自動生成)";
-                    }
-                    
-                    document.getElementById("updateInfo").textContent = 
-                        `最終更新: ${updatedTime} | バージョン: ${version}`;
-                    
-                    // テーブル生成
-                    tableData = data.values.slice(1); // ヘッダー行を除くデータを保存
-                    createTable(data.values);
-                    document.getElementById('errorArea').innerHTML = ''; // エラーをクリア
-                } catch (error) {
-                    showError(`データ処理エラー: ${error.message}`);
-                }
-                
-                // 使い終わったコールバック関数を削除
-                delete window[callbackName];
-            };
-            
-            // script要素を作成
-            const script = document.createElement('script');
-            script.src = webAppUrl + '?callback=' + callbackName + '&t=' + new Date().getTime();
-            
-            // エラーハンドラーを設定
-            script.onerror = function(e) {
-                showError("スクリプト読み込みエラー: Google Apps ScriptのURLを確認してください。");
-                document.getElementById('updateInfo').textContent = 
-                    `エラーが発生しました | バージョン: ${version}`;
-                // 使い終わったコールバック関数を削除
-                delete window[callbackName];
-            };
-            
-            // ページにスクリプトを追加
-            document.body.appendChild(script);
-            
-            // 30秒後のタイムアウト処理
-            setTimeout(function() {
-                if (window[callbackName]) {
-                    showError("データ読み込みがタイムアウトしました。ネットワークまたはスクリプトURLを確認してください。");
-                    document.getElementById('updateInfo').textContent = 
-                        `タイムアウト | バージョン: ${version}`;
-                    delete window[callbackName];
-                }
-            }, 30000);
-        }
-        
-        // 日付フォーマット関数
-        function formatDate(date) {
-            try {
-                if (isNaN(date.getTime())) {
-                    throw new Error("無効な日付");
-                }
-                
-                const year = date.getFullYear();
-                const month = (date.getMonth() + 1).toString().padStart(2, '0');
-                const day = date.getDate().toString().padStart(2, '0');
-                return `${year}/${month}/${day}`;
-            } catch (error) {
-                console.error("日付フォーマットエラー:", error);
-                const now = new Date();
-                return `${now.getFullYear()}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getDate().toString().padStart(2, '0')}`;
-            }
-        }
+<script>
+// ===================== 設定 =====================
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxXHfQ7WI3hSQrItJyG-iBn6IItql81YUNMu_rayyKe4gBDkl_ijrxyutGOEQZV2j_F/exec';
+const PLAYLIST_URL = 'https://www.youtube.com/playlist?list=PLKffMDfIWsbbXZXSjrkkiFI1pk-sGPN4F';
+const SITE_VERSION = 'v1.0.0';
 
-        // テーブル作成関数
-        function createTable(rows) {
-            if (!rows || rows.length === 0) {
-                showError("テーブルデータがありません");
-                return;
-            }
-            
-            const tableHeader = document.getElementById("tableHeader");
-            tableHeader.innerHTML = ""; // ヘッダーをクリア
-            
-            // ヘッダー行の処理
-            rows[0].forEach((header, index) => {
-                const th = document.createElement("th");
-                th.textContent = header;
-                
-                // ソート不可の列はクリックイベントを付けない
-                if (!unsortableColumns.includes(index)) {
-                    th.onclick = () => sortTable(index);
-                    th.innerHTML += `<span class="sort-icon">▲▼</span>`;
-                }
-                
-                tableHeader.appendChild(th);
-            });
-            
-            // データ行の処理
-            renderTable(tableData);
-            
-            // 検索結果カウントの更新
-            document.getElementById("resultCount").textContent = 
-                `🔍 検索結果: ${tableData.length} 件`;
-        }
-        
-        function renderTable(data) {
-            const tableBody = document.getElementById("tableBody");
-            tableBody.innerHTML = ""; // テーブルをクリア
-            
-            if (!data || data.length === 0) {
-                tableBody.innerHTML = "<tr><td colspan='7'>データがありません</td></tr>";
-                return;
-            }
-            
-            data.forEach(row => {
-                const tr = document.createElement("tr");
-                
-                // 各セルの作成
-                for (let i = 0; i < row.length; i++) {
-                    const td = document.createElement("td");
-                    
-                    // 値の変換・整形
-                    let cellValue = row[i];
-                    
-                    // 配信日の列（インデックス1）の場合は日付形式を変換
-                    if (i === 1 && cellValue) {
-                        // ISO日付文字列かどうかを判定
-                        if (typeof cellValue === 'string' && 
-                            cellValue.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
-                            const date = new Date(cellValue);
-                            if (!isNaN(date.getTime())) {
-                                cellValue = formatDate(date);
-                            }
-                        }
-                    }
-                    
-                    td.innerHTML = cellValue !== undefined && cellValue !== "" ? cellValue : "&nbsp;";
-                    tr.appendChild(td);
-                }
-                
-                tableBody.appendChild(tr);
-            });
-        }
-        
-        function sortTable(columnIndex) {
-            // ソート不可の列なら処理しない
-            if (unsortableColumns.includes(columnIndex)) return;
-            
-            // 昇順・降順を切り替え
-            const order = sortOrder[columnIndex] === "asc" ? "desc" : "asc";
-            sortOrder[columnIndex] = order;
-            
-            // データのソート
-            tableData.sort((a, b) => {
-                let valA = a[columnIndex] || "";
-                let valB = b[columnIndex] || "";
-                
-                // 数値の場合は数値としてソート
-                if (!isNaN(valA) && !isNaN(valB)) {
-                    return order === "asc" ? valA - valB : valB - valA;
-                }
-                
-                // 文字列の場合は日本語対応のソート
-                return order === "asc"
-                    ? String(valA).localeCompare(String(valB), 'ja')
-                    : String(valB).localeCompare(String(valA), 'ja');
-            });
-            
-            renderTable(tableData);
-            updateSortIcons(columnIndex, order);
-        }
-        
-        function updateSortIcons(columnIndex, order) {
-            document.querySelectorAll("th").forEach((th, index) => {
-                th.classList.toggle("sorted", index === columnIndex);
-                const icon = th.querySelector(".sort-icon");
-                if (icon) {
-                    icon.innerHTML = index === columnIndex
-                        ? (order === "asc" ? "▲" : "▼")
-                        : "▲▼";
-                }
-            });
-        }
-        
-        function filterTable() {
-            const searchText = document.getElementById("searchInput").value.toLowerCase();
-            
-            if (!tableData || tableData.length === 0) {
-                document.getElementById("resultCount").textContent = `🔍 検索結果: 0 件`;
-                return;
-            }
-            
-            const rows = document.querySelectorAll("#tableBody tr");
-            let matchCount = 0;
-            
-            rows.forEach(row => {
-                let rowMatch = false;
-                const cells = row.getElementsByTagName("td");
-                
-                // 検索キーワードで分割（スペース区切り）
-                const searchTerms = searchText.split(' ').filter(term => term.length > 0);
-                
-                if (searchTerms.length === 0) {
-                    // 検索ワードなしの場合は全表示
-                    row.style.display = "";
-                    matchCount++;
-                    
-                    // ハイライト解除
-                    Array.from(cells).forEach(cell => {
-                        cell.innerHTML = cell.textContent;
-                    });
-                    
-                    return;
-                }
-                
-                // 全てのキーワードが含まれているか（AND検索）
-                const rowText = Array.from(cells).map(cell => cell.textContent.toLowerCase()).join(' ');
-                rowMatch = searchTerms.every(term => rowText.includes(term));
-                
-                if (rowMatch) {
-                    row.style.display = "";
-                    matchCount++;
-                    
-                    // ハイライト処理
-                    Array.from(cells).forEach(cell => {
-                        let content = cell.textContent;
-                        
-                        searchTerms.forEach(term => {
-                            // 大文字小文字を区別せずにハイライト
-                            const regex = new RegExp(`(${term})`, "gi");
-                            content = content.replace(regex, '<span class="highlight">$1</span>');
-                        });
-                        
-                        cell.innerHTML = content;
-                    });
-                } else {
-                    row.style.display = "none";
-                }
-            });
-            
-            // 検索結果の件数を更新
-            document.getElementById("resultCount").textContent = `🔍 検索結果: ${matchCount} 件`;
-        }
-        
-        // ページ読み込み時の処理
-        document.addEventListener('DOMContentLoaded', function() {
-            // webAppUrl未設定のチェック
-            if (!webAppUrl || webAppUrl.includes('ここに実際のスクリプトID')) {
-                showError("Google Apps ScriptのURLが設定されていません。HTMLファイルを編集してwebAppUrlを設定してください。");
-                document.getElementById('updateInfo').textContent = 
-                    `設定が必要です | バージョン: ${version}`;
-                return;
-            }
-            
-            console.log("ページ読み込み完了、データ取得を開始します");
-            // データ取得開始
-            loadDataWithJSONP();
-        });
-    </script>
+// 配信日(JST, YYYY-MM-DD) → YouTube動画ID
+// ※スプレッドシートに「動画URL」列を追加した場合はそちらが優先されます
+const ARCHIVES = {
+/*ARCHIVES_START*/
+  "2021-07-24": "2OpGUi-s_nw",
+  "2021-08-13": "zniLupB8LxM",
+  "2021-08-20": "pmKQsb8HpAk",
+  "2021-08-27": "KCuqYKXDtew",
+  "2021-09-03": "9yIY8HhRF_c",
+  "2021-09-10": "MsCxE6oNtvo",
+  "2021-09-19": "S5sgw_RfJl0",
+  "2021-09-24": "kLQ9Z6ATts8",
+  "2021-10-01": "-JhJuHjurOw",
+  "2021-10-08": "9lvB0Dvd65o",
+  "2021-10-15": "ax0g_nyY59s",
+  "2021-10-22": "u6ZdK6AotKc",
+  "2021-10-29": "xqwRowod9bw",
+  "2021-11-06": "X2FyC3kFAio",
+  "2021-11-13": "r2tgUCqwzws",
+  "2021-11-20": "ehuDtiKdUfM",
+  "2021-11-27": "PRrWbm-ypa4",
+  "2021-12-04": "ttj7sa2PZqo",
+  "2021-12-11": "yIUCgn6m2B8",
+  "2021-12-19": "E-dfjU8EiT8",
+  "2021-12-26": "wN6i3nr5zGU",
+  "2021-12-29": "vBDLodNfqWE",
+  "2021-12-30": "bYqAfbSkJtg",
+  "2022-01-08": "a2k21M4MQw4",
+  "2022-01-15": "S1_yyys6AoA",
+  "2022-01-22": "lZjyS-SCwW8",
+  "2022-01-29": "PdzD0sBJahM",
+  "2022-02-12": "Xe8CzkC8dRM",
+  "2022-02-15": ["TDMMV8psiAA","mFVa5E8lYZw"],
+  "2022-02-19": "kCUMB4q6pfw",
+  "2022-02-26": "fsgQGx5NuQM",
+  "2022-03-06": "0LXOM3Gfj-Y",
+  "2022-03-12": "EjqgadP3jEM",
+  "2022-03-18": "vaZptSc39NI",
+  "2022-03-19": "6FUJEEQGqok",
+  "2022-03-25": "ZtSuj1pinrQ",
+  "2022-04-02": "IiX_YHd-qFU",
+  "2022-04-09": "VRHO--_gcfg",
+  "2022-04-16": "Eoa29mG6_bc",
+  "2022-04-23": "0H8lkZY8Kyk",
+  "2022-04-30": "0b17Dfx7cSY",
+  "2022-05-04": "NGA_TkFVpAk",
+  "2022-05-07": "9FaVjznmY7M",
+  "2022-05-14": "HUKfi58qU5U",
+  "2022-05-21": "nO_TRrEW3WA",
+  "2022-05-22": "pCsCgOzZPBw",
+  "2022-05-28": "wvdZjlzRfEY",
+  "2022-06-04": "k2wzDAyTS6I",
+  "2022-06-11": "jj_Yt8bfiDA",
+  "2022-06-12": "w9Zy4lU1L1A",
+  "2022-06-18": "JQaxEkHQEQs",
+  "2022-06-25": "_CMVFr3yjrk",
+  "2022-07-02": "WyrZrNdvxDU",
+  "2022-07-09": "tfzU_f__qFU",
+  "2022-07-16": "jSyE9sH_IHg",
+  "2022-07-23": "L22Jw8EpCYk",
+  "2022-07-30": "kMR60X6k27U",
+  "2022-08-06": "2020ACoiYIg",
+  "2022-08-13": "DnMywev1600",
+  "2022-08-20": "l943PrGhphg",
+  "2022-08-27": "P_Nv3eqF0k0",
+  "2022-09-03": "Cp6gqjof1yM",
+  "2022-09-10": "kdCCrferxmM",
+  "2022-09-24": ["ozYLIOiM1Aw","6-1WGWy78rQ"],
+  "2022-10-01": "TuVZmMkPZ1c",
+  "2022-10-08": "VeCJyzrkA70",
+  "2022-10-09": "JtjAUsSsoR4",
+  "2022-10-15": "ca1rAzjVqvU",
+  "2022-10-22": "TXFosxhMMcU",
+  "2022-10-29": "7B1KxQHwJdw",
+  "2022-11-03": "W7oMt1BDJg8",
+  "2022-11-05": "C48g-wCwM2E",
+  "2022-11-12": "DVDtx2Fsb-k",
+  "2022-11-19": "4OBkqfmZCqE",
+  "2022-11-27": "CU8tcgLMYGI",
+  "2022-12-03": "rL1jE3HuycA",
+  "2022-12-10": "TAuUvf_Z1v8",
+  "2022-12-17": "pJh9YbBI7Rw",
+  "2022-12-25": "skn-hmHmaZI",
+  "2022-12-30": "VeNIN-DFAko",
+  "2023-01-07": "HmgwG59lqzw",
+  "2023-01-14": "pVYLcmKYqWA",
+  "2023-01-21": "RB1hVoq-8JA",
+  "2023-01-28": "CPoiJkGoImI",
+  "2023-02-04": "9XMzMBM4bng",
+  "2023-02-11": "N3Zh1so62Xw",
+  "2023-02-18": "WwsTRbHcZaE",
+  "2023-02-23": ["NAbYcqFUjDs","HCmrkV6GQpQ"],
+  "2023-03-04": "4GMjHK7SCzM",
+  "2023-03-11": "QPFja7JtWb8",
+  "2023-03-18": "s40wXuwb054",
+  "2023-03-26": "EulmCP_BONQ",
+  "2023-04-01": "jxbPMJablak",
+  "2023-04-15": "7v5s4EQxsVE",
+  "2023-04-22": "KRBM1xbGi_A",
+  "2023-04-30": "Jj-giiX2ZD0",
+  "2023-05-03": "AVOYDDn3SAc",
+  "2023-05-06": "0wlgWIW2-jE",
+  "2023-05-13": "9PK6OErpTzI",
+  "2023-05-20": "fInpGjzZI0M",
+  "2023-05-27": "WhrNwAd2Khc",
+  "2023-06-03": "1jwlKikU7xQ",
+  "2023-06-10": "9wEmH2QK1UE",
+  "2023-06-11": "FbHz6w7rQsQ",
+  "2023-06-17": "hG59kqksdLo",
+  "2023-06-24": "NiMj_4Ke1YE",
+  "2023-07-01": "vS0mSwcSnlM",
+  "2023-07-08": "m0KCW9W-MVI",
+  "2023-07-15": "i50tkEzqktA",
+  "2023-07-22": "8LU33qCA09Q",
+  "2023-07-23": "uIXxy3sn7-8",
+  "2023-07-29": "Nd0yXcgjn4g",
+  "2023-08-05": "wHSNZPhdzDE",
+  "2023-08-13": "Ps6twcV0Ufc",
+  "2023-08-19": "iVIaTDgxzvE",
+  "2023-08-26": "aNHE3YM7pK4",
+  "2023-09-02": "lIFmUy-T9zI",
+  "2023-09-09": "4Ddm6FI3JYI",
+  "2023-09-16": "nUy46ofYMcI",
+  "2023-09-23": "yEr6DOaaV4U",
+  "2023-10-07": "g9wmLNEwPJs",
+  "2023-10-09": ["u-VrwxdUrYs","DFMJX7vxv-U"],
+  "2023-10-14": "i8RBrl-Ll0c",
+  "2023-10-21": "wke5oN4WZFs",
+  "2023-10-28": "TopmTcRTn4k",
+  "2023-11-04": "7sM9C7PRhjM",
+  "2023-11-11": "POPG7L6LdxU",
+  "2023-11-18": "lbBzew4ywGs",
+  "2023-11-25": "cQI7pMiNKkg",
+  "2023-12-02": "ibgZiYJm9JI",
+  "2023-12-09": "rk3wSeJFwVg",
+  "2023-12-16": "Wy_NqmX9X0w",
+  "2023-12-23": "SGGZYUkZ3g8",
+  "2023-12-30": "rp_CgCeIZkk",
+  "2024-01-06": "i6YxuI7tYDE",
+  "2024-01-13": "jK0hIuxiG9A",
+  "2024-01-20": "g0wZuTRsM6Y",
+  "2024-01-27": "Mqt5OSQ3ZZI",
+  "2024-02-03": "3NkydTrQhRA",
+  "2024-02-12": "mT2_7x9GNLg",
+  "2024-02-17": "HK1eHhvgiok",
+  "2024-02-23": "_ATkb0_uykQ",
+  "2024-03-02": "jXqj08OWb0w",
+  "2024-03-09": "igrnV4xFVqs",
+  "2024-03-16": "RBhLHECCaT0",
+  "2024-03-24": "wDZuHDcdt3M",
+  "2024-03-30": "h_SSyci3Dj4",
+  "2024-04-06": "YhjuwMz6Urk",
+  "2024-04-13": "ljU6IpS3A1Q",
+  "2024-04-20": "hlSln5_ET4o",
+  "2024-04-27": "ffl9zA8qUVA",
+  "2024-05-04": "ib-F4Y8AtXU",
+  "2024-05-11": "pI2QplB5O84",
+  "2024-05-18": "N8RwhkcqOxU",
+  "2024-05-25": "9vKZB9cXW-k",
+  "2024-06-08": "LtGXtwyy5x8",
+  "2024-06-15": "a2l6VzHCtwA",
+  "2024-06-22": "Pt53DJqpXz8",
+  "2024-06-29": "9omFdJAhDxQ",
+  "2024-07-07": "1vlf9gVtmM4",
+  "2024-07-13": "Bx31aQrahnM",
+  "2024-07-20": "4OtQNp4fpcM",
+  "2024-07-27": "x46_xslykdg",
+  "2024-08-04": "AWh4lb5kdQs",
+  "2024-08-09": "q3YSmcXUM-I",
+  "2024-08-17": "hHPQxY-s2eY",
+  "2024-08-24": "ajTkLfX_5SI",
+  "2024-08-31": "eO0htLXQYew",
+  "2024-09-14": "x316XjzUF7A",
+  "2024-09-21": "7EEEN38nY74",
+  "2024-09-28": "PVO0JPjfuG0",
+  "2024-10-05": "t2eGpp0ztPM",
+  "2024-10-12": "LK8hBaztPHU",
+  "2024-10-19": "m4GDRuOkzQQ",
+  "2024-10-26": "26Q47OTH0m0",
+  "2024-11-02": "GYPyR38W3rc",
+  "2024-11-09": "R-O62ujs_wg",
+  "2024-11-16": "Rpe-E2Jllc8",
+  "2024-11-30": "Ycfv4Kr4Wqk",
+  "2024-12-14": "YI9B0Vvlwew",
+  "2024-12-21": "Bla1CFwgyeI",
+  "2024-12-28": "cX8d-ZA5sOI",
+  "2025-01-04": "t8cd5IEUJBE",
+  "2025-01-11": "NtTFQYZKSjs",
+  "2025-01-18": "zpeRELOQ0PU",
+  "2025-01-26": "pk1FQzymdpo",
+  "2025-02-01": "oBaF8RXkCdo",
+  "2025-02-08": "AVbnOpCcV9Q",
+  "2025-02-15": "l3UWd7_qDKA",
+  "2025-02-22": "OXLwCABKX6k",
+  "2025-03-01": "c_7cjClImws",
+  "2025-03-09": "BiGIBLJwRxg",
+  "2025-03-15": "SAi_wj-kLco",
+  "2025-03-22": "c3SUCLLN1sY",
+  "2025-03-29": "k9J4FlXrfz0",
+  "2025-04-05": "lALmtUJgo-k",
+  "2025-04-19": "H-9yaUqz780",
+  "2025-04-26": "jPhAVrC9dDA",
+  "2025-05-05": "Mt1CjSaYG5U",
+  "2025-05-17": "nHyv5YBqlt8",
+  "2025-05-24": "MCsgI5i7VaI",
+  "2025-05-31": "MUW3kQjjcmc",
+  "2025-06-07": "N3N4qQ-rAmI",
+  "2025-06-14": "ikMqdnxKOjc",
+  "2025-06-28": "S51ZHbvLlkA",
+  "2025-07-05": "ENFN1P8wA6M",
+  "2025-07-12": "6veXRaOUgSU",
+  "2025-07-20": "rvpyrKoBbpg",
+  "2025-07-26": "822jkC8MDUU",
+  "2025-08-02": "2OAqEZV_0yc",
+  "2025-08-10": "UZPG1Yj29As",
+  "2025-08-15": "neu8ptswkLI",
+  "2025-08-23": "A6dDRDYropc",
+  "2025-08-30": "LsCZc0ypJAc",
+  "2025-09-06": "CT46QG8voRE",
+  "2025-09-13": "-THpvVFXrJs",
+  "2025-09-27": "p_usZvGKXrc",
+  "2025-10-04": "IkDYhmjWqCw",
+  "2025-10-11": "GL8-tfflGLw",
+  "2025-10-18": "wtJf2OG_Pq0",
+  "2025-10-25": "sRGjOkxqC7c",
+  "2025-11-01": "d7TpDatkc8c",
+  "2025-11-08": "wH39ktyv9Qk",
+  "2025-11-15": "9BzdZD6S_AY",
+  "2025-11-22": "ZyVaNjB0y6o",
+  "2025-11-29": "EWFGR3N-RD0",
+  "2025-12-06": "FNVD3LmSDjM",
+  "2025-12-13": "75Oe8s7sy-Y",
+  "2025-12-20": "JqJjNqommpM",
+  "2025-12-27": "43tEEY2CnwU",
+  "2026-01-03": "TmTOnV84Apc",
+  "2026-01-10": "TeSOaiRYKAM",
+  "2026-01-17": "gnrI8VFCQnU",
+  "2026-01-24": "vwQ4OkpTfWI",
+  "2026-01-31": "1SxVSx7Yg20",
+  "2026-02-07": "IgDEMZhin5Q",
+  "2026-02-14": "SYEyyZl5oPQ",
+  "2026-02-21": "k6weCYdsHYg",
+  "2026-02-28": "yt5WM8L-28c",
+  "2026-03-14": "V0eJbABPnic",
+  "2026-03-20": "cCxd0D16Gig",
+  "2026-04-04": "oTIfhnV6-jk",
+  "2026-04-11": "30M68ZYkMwU",
+  "2026-04-18": "Gsg6hEC9mNc",
+  "2026-04-25": "cRM_l1UdYAA",
+  "2026-05-02": "B08LEf8C-so",
+  "2026-05-16": "5isISoOMaf0",
+  "2026-05-23": "LNvcNB_X4qM",
+  "2026-05-30": "P98lZGM-u-I",
+  "2026-06-06": "C1tpSMjGL4c",
+  "2026-06-13": "0JH1a5Q81Kk",
+  "2026-06-20": "yng9_zyxuN0",
+  "2026-06-27": "eh87xw1gEws",
+  "2026-07-04": "LBQVchCtzxI",
+  "2026-07-11": "wNqXnpfc7g0",
+  "2026-07-18": "XhqUAzZ2-7s",
+  "2026-08-01": "REGRxbFAUJY",
+  "2026-08-08": "aEBURijDDrQ",
+  "2026-08-15": "DwFAfurIP5k",
+  "2026-08-29": "C6-oPXu4CQU",
+  "2026-09-05": "-UJRB-DX1_w",
+  "2026-09-12": "W6-gjVOHu6g",
+  "2026-09-19": "JMerofkI1d0",
+  "2026-10-03": "GzVIQM4HGBE",
+  "2026-10-24": "OoLyayJYyR4",
+/*ARCHIVES_END*/
+};
 
+// ===================== ユーティリティ =====================
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// 検索用の正規化：全角半角・大小文字・カタカナ/ひらがなの違いを吸収、空白除去
+const norm = s => String(s ?? '').normalize('NFKC').toLowerCase()
+  .replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60))
+  .replace(/\s+/g, '');
+const pad = n => String(n).padStart(2, '0');
+function jstDate(v){
+  const d = new Date(v);
+  if (isNaN(d)) return null;
+  const j = new Date(d.getTime() + 9*3600e3);
+  return `${j.getUTCFullYear()}-${pad(j.getUTCMonth()+1)}-${pad(j.getUTCDate())}`;
+}
+const fmtDate = k => k ? k.replace(/-/g, '/') : '日付不明';
+const WEEK = '日月火水木金土';
+const fmtDateW = k => { if(!k) return '日付不明'; const d = new Date(k+'T00:00:00+09:00'); return `${fmtDate(k)}(${WEEK[d.getDay()]})`; };
+function hue(str){ let h = 0; for (const c of String(str)) h = (h*31 + c.codePointAt(0)) % 360; return h; }
+function avatar(p, cls=''){
+  const ch = [...(p.name || '?')][0];
+  return `<div class="avatar ${cls}" style="background:hsl(${hue(p.id)},65%,55%)">${esc(ch)}</div>`;
+}
+function ytId(v){
+  if (!v) return null;
+  const s = String(v).trim();
+  const m = s.match(/(?:v=|youtu\.be\/|live\/|shorts\/|embed\/)([\w-]{11})/);
+  if (m) return m[1];
+  return /^[\w-]{11}$/.test(s) ? s : null;
+}
+// 検索語のハイライト（正規化前の文字列上で、大文字小文字無視の素朴な一致のみ）
+function hl(text, terms){
+  let out = esc(text);
+  if (!terms || !terms.length) return out;
+  for (const t of terms){
+    if (!t) continue;
+    const re = new RegExp(esc(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    out = out.replace(re, m => `<mark>${m}</mark>`);
+  }
+  return out;
+}
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 1600);
+}
+async function copyText(txt){
+  try { await navigator.clipboard.writeText(txt); }
+  catch { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+}
+
+// ===================== データ =====================
+const DB = { rows: [], streams: [], streamByKey: new Map(), progs: new Map(), updated: '' };
+
+function loadJSONP(){
+  return new Promise((resolve, reject) => {
+    const cb = 'cb_' + Date.now();
+    const sc = document.createElement('script');
+    const timer = setTimeout(() => { cleanup(); reject(new Error('タイムアウトしました')); }, 30000);
+    function cleanup(){ clearTimeout(timer); delete window[cb]; sc.remove(); }
+    window[cb] = data => { cleanup(); resolve(data); };
+    sc.onerror = () => { cleanup(); reject(new Error('データの読み込みに失敗しました')); };
+    sc.src = `${WEB_APP_URL}?callback=${cb}&t=${Date.now()}`;
+    document.body.appendChild(sc);
+  });
+}
+
+function build(data){
+  const [head, ...body] = data.values;
+  const col = name => head.findIndex(h => String(h).trim() === name);
+  const C = {
+    no: col('No.'), date: col('配信日'), sno: col('配信No.'),
+    pid: col('プログラマID'), pname: col('プログラマ名'),
+    gid: col('ゲームID'), gname: col('ゲーム名'),
+    url: head.findIndex(h => /URL|動画|アーカイブ/i.test(String(h))),
+  };
+  DB.updated = data.timestamp || '';
+
+  for (const r of body){
+    if (!r[C.gname] && !r[C.pname]) continue;
+    const dateKey = jstDate(r[C.date]);
+    const snoRaw = String(r[C.sno] ?? '').trim();
+    const row = {
+      no: Number(r[C.no]) || 0,
+      date: dateKey,
+      sno: snoRaw,
+      pid: String(r[C.pid] ?? '').trim(),
+      pname: String(r[C.pname] ?? '').trim(),
+      gid: String(r[C.gid] ?? '').trim(),
+      gname: String(r[C.gname] ?? '').trim(),
+      url: C.url >= 0 ? ytId(r[C.url]) : null,
+    };
+    row.pkey = row.pid || ('name:' + row.pname);
+    row.search = norm(row.gname + ' ' + row.pname + ' ' + row.gid + ' ' + row.pid);
+    DB.rows.push(row);
+
+    // 配信回
+    const skey = (dateKey || '') + '|' + snoRaw;
+    let st = DB.streamByKey.get(skey);
+    if (!st){
+      const num = /^\d+$/.test(snoRaw) ? Number(snoRaw) : null;
+      st = { key: skey, date: dateKey, sno: snoRaw, num, special: num === null, games: [], video: null, videos: [] };
+      DB.streamByKey.set(skey, st);
+      DB.streams.push(st);
+    }
+    st.games.push(row);
+    if (row.url && !st.videos.includes(row.url)) st.videos.push(row.url);
+    row.stream = st;
+
+    // プログラマ
+    let p = DB.progs.get(row.pkey);
+    if (!p){ p = { id: row.pkey, pid: row.pid, names: new Map(), games: [], streams: new Set() }; DB.progs.set(row.pkey, p); }
+    p.games.push(row);
+    p.streams.add(st);
+    p.names.set(row.pname, (p.names.get(row.pname) || 0) + 1);
+  }
+
+  DB.streams.sort((a,b) => (a.date||'').localeCompare(b.date||'') || a.games[0].no - b.games[0].no);
+  DB.streams.forEach((s, i) => {
+    s.idx = i + 1; // 通算何回目か
+    if (!s.videos.length && s.date && ARCHIVES[s.date]) s.videos = [].concat(ARCHIVES[s.date]);
+    s.video = s.videos[0] || null;
+    s.games.sort((a,b) => a.no - b.no);
+  });
+  for (const p of DB.progs.values()){
+    p.games.sort((a,b) => a.no - b.no);
+    p.name = p.games[p.games.length - 1].pname || '(名前なし)'; // 最新の名前
+    p.allNames = [...p.names.keys()].filter(Boolean);
+    p.first = p.games[0].stream;
+    p.last = p.games[p.games.length - 1].stream;
+    p.search = norm(p.allNames.join(' ') + ' ' + p.pid);
+  }
+  DB.progList = [...DB.progs.values()].sort((a,b) => b.games.length - a.games.length || a.first.idx - b.first.idx);
+  DB.progList.forEach((p,i) => p.rank = i + 1);
+}
+
+// ===================== 部品 =====================
+function streamTitle(s){
+  if (s.num !== null) return `第${s.num}回`;
+  if (!s.sno || s.sno === '採番なし') return s.idx === 1 ? '初回配信' : '特別配信';
+  return s.sno;
+}
+function streamLink(s){ return `#/stream/${encodeURIComponent(s.key)}`; }
+function progLink(p){ return `#/p/${encodeURIComponent(p.id)}`; }
+function ytBtn(s, label='▶ アーカイブ'){
+  return s.video ? `<a class="yt" href="https://www.youtube.com/watch?v=${esc(s.video)}" target="_blank" rel="noopener">${label}</a>` : '';
+}
+function gidBtn(g){
+  return g.gid ? `<button class="gid" data-copy="${esc(g.gid)}" title="クリックでコピー">${esc(g.gid)}</button>` : '';
+}
+function streamCard(s){
+  const img = s.video ? `<img loading="lazy" src="https://i.ytimg.com/vi/${esc(s.video)}/mqdefault.jpg" alt="">` : '';
+  const label = s.num !== null ? `#${s.num}` : '★';
+  return `<a class="stream" href="${streamLink(s)}">
+    <div class="thumb">${label}${img}${img ? `<span class="num">${label}</span>` : ''}<span class="badge">${s.games.length}作品</span></div>
+    <div class="body">
+      <div class="ttl">${s.special ? '<span class="tag sp">企画</span>' : ''}${esc(streamTitle(s))}</div>
+      <div class="muted">${fmtDateW(s.date)}</div>
+    </div></a>`;
+}
+function gameRow(g, {terms, showStream = true, showBy = true} = {}){
+  const s = g.stream, p = DB.progs.get(g.pkey);
+  return `<div class="game">
+    <div class="main">
+      <div class="gname">${hl(g.gname || '(タイトルなし)', terms)}</div>
+      ${showBy ? `<div class="by">by <a href="${progLink(p)}">${hl(g.pname || '(名前なし)', terms)}</a></div>` : ''}
+    </div>
+    <div class="side">
+      ${showStream ? `<a href="${streamLink(s)}">${esc(streamTitle(s))}・${fmtDate(s.date)}</a>` : ''}
+      ${gidBtn(g)}
+      ${ytBtn(s, '▶')}
+    </div></div>`;
+}
+function progRow(p, {rank, terms} = {}){
+  const r = rank ? `<div class="rank r${rank}">${rank}</div>` : '';
+  const others = p.allNames.filter(n => n !== p.name);
+  return `<a class="prow" href="${progLink(p)}">${r}${avatar(p)}
+    <div><div class="nm">${hl(p.name, terms)}</div>
+    <div class="muted">${others.length ? '別名: ' + hl(others.slice(0,3).join(' / '), terms) + (others.length > 3 ? ' 他' : '') + '<br>' : ''}初登場 ${fmtDate(p.first.date)}</div></div>
+    <div class="cnt">${p.games.length}<small>作品</small></div></a>`;
+}
+
+// ページング付きリスト
+function paged(container, items, render, size = 60){
+  let n = 0;
+  const box = document.createElement('div');
+  box.className = container.dataset.cls || '';
+  const btn = document.createElement('button');
+  btn.className = 'btn more';
+  container.append(box, btn);
+  function more(){
+    box.insertAdjacentHTML('beforeend', items.slice(n, n + size).map(render).join(''));
+    n += size;
+    btn.style.display = n < items.length ? '' : 'none';
+    btn.textContent = `もっと見る（残り ${items.length - n} 件）`;
+  }
+  btn.onclick = more;
+  if (!items.length) box.innerHTML = '<div class="empty">見つかりませんでした</div>';
+  more();
+}
+
+// ===================== 画面 =====================
+const app = $('#app');
+let searchTimer;
+
+function viewHome(){
+  const total = DB.rows.length;
+  const years = new Set(DB.streams.map(s => s.date?.slice(0,4)).filter(Boolean));
+  const latest = DB.streams.slice(-4).reverse();
+  app.innerHTML = `
+    <div class="stats">
+      <div class="stat"><b>${DB.streams.length}</b><span>配信回数</span></div>
+      <div class="stat"><b>${total.toLocaleString()}</b><span>プレイした作品</span></div>
+      <div class="stat"><b>${DB.progs.size}</b><span>プログラマ</span></div>
+      <div class="stat"><b>${[...years][0]}–${String([...years].pop()).slice(2)}</b><span>配信期間（${fmtDate(DB.streams[0].date).slice(0,7)}〜）</span></div>
+    </div>
+    <div class="card hero">
+      <p>あなたのゲームはいつ遊ばれた？ 名前・ゲーム名・ID で探してみよう</p>
+      <div class="search"><input id="q" type="search" placeholder="例：プログラマ名 / ゲーム名 / G 002 JTJ 6TB" autocomplete="off"></div>
+      <div id="res"></div>
+    </div>
+    <h2>🎲 ランダムに1本</h2>
+    <div class="card" id="pick"></div>
+    <h2>🆕 最近の配信 <a class="muted" href="#/streams" style="font-weight:400">すべて見る →</a></h2>
+    <div class="grid">${latest.map(streamCard).join('')}</div>
+  `;
+  const q = $('#q');
+  q.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => homeSearch(q.value), 150); });
+  const saved = sessionStorage.getItem('q'); if (saved){ q.value = saved; homeSearch(saved); }
+  renderPick();
+}
+function renderPick(){
+  const g = DB.rows[Math.floor(Math.random() * DB.rows.length)];
+  const p = DB.progs.get(g.pkey), s = g.stream;
+  $('#pick').innerHTML = `<div class="pick">${avatar(p)}
+    <div style="flex:1;min-width:200px"><div class="big">${esc(g.gname)}</div>
+    <div class="muted">by <a href="${progLink(p)}">${esc(g.pname)}</a> ・ <a href="${streamLink(s)}">${esc(streamTitle(s))}（${fmtDate(s.date)}）</a></div></div>
+    <div class="side" style="display:flex;gap:8px;align-items:center">${gidBtn(g)}${ytBtn(s)}<button class="btn primary" id="reroll">🎲 もう1回</button></div></div>`;
+  $('#reroll').onclick = renderPick;
+}
+function parseTerms(q){ return q.split(/[\s　]+/).filter(Boolean); }
+function matchAll(text, nterms){ return nterms.every(t => text.includes(t)); }
+
+function homeSearch(q){
+  sessionStorage.setItem('q', q);
+  const res = $('#res');
+  const terms = parseTerms(q), nterms = terms.map(norm);
+  if (!terms.length){ res.innerHTML = ''; return; }
+  const progs = DB.progList.filter(p => matchAll(p.search, nterms));
+  const games = DB.rows.filter(g => matchAll(g.search, nterms));
+  res.innerHTML = `<p class="muted" style="margin:12px 0 8px">プログラマ ${progs.length}人 ・ ゲーム ${games.length}件</p>`;
+  if (progs.length){
+    res.insertAdjacentHTML('beforeend', '<h2 style="margin-top:8px">👤 プログラマ</h2>');
+    const c = document.createElement('div'); c.dataset.cls = 'games'; res.appendChild(c);
+    paged(c, progs, p => progRow(p, {terms}), 6);
+  }
+  if (games.length){
+    res.insertAdjacentHTML('beforeend', '<h2>🎮 ゲーム</h2>');
+    const c = document.createElement('div'); c.dataset.cls = 'games'; res.appendChild(c);
+    paged(c, games.slice().reverse(), g => gameRow(g, {terms}), 20);
+  }
+  if (!progs.length && !games.length) res.insertAdjacentHTML('beforeend', '<div class="empty">見つかりませんでした。表記を変えて試してみてください</div>');
+}
+
+function viewStreams(year){
+  const years = [...new Set(DB.streams.map(s => s.date?.slice(0,4)).filter(Boolean))].reverse();
+  year = year || 'all';
+  let list = DB.streams.slice().reverse();
+  if (year === 'special') list = list.filter(s => s.special);
+  else if (year !== 'all') list = list.filter(s => s.date?.startsWith(year));
+  app.innerHTML = `<h2>📺 配信回一覧 <span class="muted">${list.length}回</span></h2>
+    <div class="chips">
+      <a class="chip ${year==='all'?'on':''}" href="#/streams">すべて</a>
+      ${years.map(y => `<a class="chip ${year===y?'on':''}" href="#/streams/${y}">${y}年</a>`).join('')}
+      <a class="chip ${year==='special'?'on':''}" href="#/streams/special">★ 企画回</a>
+    </div><div id="list"></div>`;
+  const c = $('#list'); c.dataset.cls = 'grid';
+  paged(c, list, streamCard, 48);
+}
+
+function viewStream(key){
+  const s = DB.streamByKey.get(key);
+  if (!s) return notFound();
+  const i = s.idx - 1, prev = DB.streams[i-1], next = DB.streams[i+1];
+  const players = new Set(s.games.map(g => g.pkey));
+  const firsts = s.games.filter(g => DB.progs.get(g.pkey).first === s).length;
+  app.innerHTML = `
+    <a class="back" href="#/streams">← 配信回一覧</a>
+    <div class="card">
+      <div class="two" style="align-items:center">
+        <div>
+          <div class="muted">通算${s.idx}回目の配信</div>
+          <h2 style="margin:2px 0 6px;font-size:1.5rem">${s.special?'<span class="tag sp">企画</span>':''}${esc(streamTitle(s))}</h2>
+          <div>${fmtDateW(s.date)}</div>
+          <div class="kv">
+            <div><b>${s.games.length}</b><span>作品</span></div>
+            <div><b>${players.size}</b><span>プログラマ</span></div>
+            <div><b>${firsts}</b><span>初登場</span></div>
+          </div>
+          <p style="display:flex;gap:8px;flex-wrap:wrap">${s.videos.length ? s.videos.map((v, k) => `<a class="yt" href="https://www.youtube.com/watch?v=${esc(v)}" target="_blank" rel="noopener">▶ YouTubeでアーカイブを見る${s.videos.length > 1 ? `（${k+1}本目）` : ''}</a>`).join('') : `<a href="${PLAYLIST_URL}" target="_blank" rel="noopener">📺 再生リストから探す</a>`}</p>
+        </div>
+        ${s.video ? `<a href="https://www.youtube.com/watch?v=${esc(s.video)}" target="_blank" rel="noopener" class="thumb" style="border-radius:12px"><img src="https://i.ytimg.com/vi/${esc(s.video)}/hqdefault.jpg" alt=""></a>` : ''}
+      </div>
+    </div>
+    <h2>🎮 プレイしたゲーム（プレイ順）</h2>
+    <div class="games">${s.games.map((g, k) => gameRow(g, {showStream:false}).replace('<div class="main">', `<div class="no">${k+1}</div><div class="main">`)).join('')}</div>
+    <p style="display:flex;justify-content:space-between;margin-top:20px">
+      <span>${prev ? `<a href="${streamLink(prev)}">← ${esc(streamTitle(prev))}</a>` : ''}</span>
+      <span>${next ? `<a href="${streamLink(next)}">${esc(streamTitle(next))} →</a>` : ''}</span>
+    </p>`;
+}
+
+function viewProgrammers(){
+  app.innerHTML = `<h2>👤 プログラマ一覧 <span class="muted">${DB.progs.size}人</span></h2>
+    <div class="search" style="margin-bottom:10px"><input id="pq" type="search" placeholder="名前・プログラマIDで絞り込み（過去の名前でもOK）" autocomplete="off"></div>
+    <div class="chips" id="psort">
+      <button class="chip on" data-s="count">作品数順</button>
+      <button class="chip" data-s="new">新しく参加した順</button>
+      <button class="chip" data-s="old">古参順</button>
+      <button class="chip" data-s="name">名前順</button>
+    </div><div id="list"></div>`;
+  let sort = 'count';
+  const draw = () => {
+    const nterms = parseTerms($('#pq').value).map(norm);
+    let list = DB.progList.filter(p => matchAll(p.search, nterms));
+    if (sort === 'new') list = list.slice().sort((a,b) => b.first.idx - a.first.idx || b.games[0].no - a.games[0].no);
+    if (sort === 'old') list = list.slice().sort((a,b) => a.first.idx - b.first.idx || a.games[0].no - b.games[0].no);
+    if (sort === 'name') list = list.slice().sort((a,b) => a.name.localeCompare(b.name, 'ja'));
+    const c = $('#list'); c.innerHTML = ''; c.dataset.cls = 'games';
+    const terms = parseTerms($('#pq').value);
+    paged(c, list, p => progRow(p, {terms}), 50);
+  };
+  $('#pq').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(draw, 150); });
+  $('#psort').onclick = e => {
+    const b = e.target.closest('[data-s]'); if (!b) return;
+    sort = b.dataset.s;
+    document.querySelectorAll('#psort .chip').forEach(x => x.classList.toggle('on', x === b));
+    draw();
+  };
+  draw();
+}
+
+function viewProgrammer(id){
+  const p = DB.progs.get(id);
+  if (!p) return notFound();
+  const streams = [...p.streams].sort((a,b) => a.idx - b.idx);
+  const others = p.allNames.filter(n => n !== p.name);
+  const url = location.href;
+  const shareText = `たくらぼさんのはじプロ配信で、私（${p.name}）のゲームが${p.games.length}作品プレイされました！🎮`;
+  const byYear = {};
+  for (const g of p.games){ const y = g.stream.date?.slice(0,4) || '?'; byYear[y] = (byYear[y]||0) + 1; }
+  // 投稿の多い順位（作品数が同じ人は同順位）
+  const rank = DB.progList.findIndex(x => x.games.length === p.games.length) + 1;
+  app.innerHTML = `
+    <a class="back" href="#/programmers">← プログラマ一覧</a>
+    <div class="card">
+      <div class="profile">${avatar(p)}
+        <div style="flex:1;min-width:200px">
+          <h2>${esc(p.name)}</h2>
+          ${p.pid ? `<button class="gid" data-copy="${esc(p.pid)}" title="クリックでコピー">${esc(p.pid)}</button>` : ''}
+          ${others.length ? `<div class="muted" style="margin-top:4px">過去の名前: ${esc(others.join(' / '))}</div>` : ''}
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a class="share" target="_blank" rel="noopener" href="https://x.com/intent/post?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}">𝕏 でシェア</a>
+          <button class="btn" data-copy="${esc(url)}">🔗 リンクをコピー</button>
+        </div>
+      </div>
+      <div class="kv">
+        <div><b>${p.games.length}</b><span>プレイされた作品</span></div>
+        <div><b>${streams.length}</b><span>登場した配信</span></div>
+        <div><b>${rank}位</b><span>作品数ランキング</span></div>
+        <div><b>${fmtDate(p.first.date)}</b><span>初登場（${esc(streamTitle(p.first))}）</span></div>
+        <div><b>${fmtDate(p.last.date)}</b><span>最新登場</span></div>
+      </div>
+    </div>
+    ${Object.keys(byYear).length > 1 ? `<h2>📈 年ごとの作品数</h2><div class="card">${barsHTML(Object.entries(byYear).map(([y,v]) => [y+'年', v]))}</div>` : ''}
+    <h2>🎮 プレイされた作品（${p.games.length}）</h2>
+    <div class="games">${p.games.slice().reverse().map(g => gameRow(g, {showBy:false})).join('')}</div>`;
+}
+
+function viewGames(){
+  app.innerHTML = `<h2>🗂 ゲーム一覧（表）</h2>
+    <div class="search" style="margin-bottom:10px"><input id="gq" type="search" placeholder="ゲーム名・プログラマ名・IDで絞り込み（スペースでAND検索）" autocomplete="off"></div>
+    <p class="muted" id="gcount"></p>
+    <div class="tablewrap"><table><thead><tr>
+      <th data-k="no">No.</th><th data-k="date">配信日</th><th data-k="stream">配信回</th>
+      <th data-k="gname">ゲーム名</th><th data-k="pname">プログラマ</th><th>ゲームID</th><th></th>
+    </tr></thead><tbody id="tb"></tbody></table></div>
+    <button class="btn more" id="gmore"></button>`;
+  let sortK = 'no', asc = false, list = [], n = 0;
+  const SIZE = 100;
+  const keyOf = (g, k) => k === 'stream' ? g.stream.idx : k === 'date' ? (g.date || '') : g[k];
+  function rowHTML(g, terms){
+    const p = DB.progs.get(g.pkey);
+    return `<tr><td>${g.no}</td><td>${fmtDate(g.date)}</td>
+      <td><a href="${streamLink(g.stream)}">${esc(streamTitle(g.stream))}</a></td>
+      <td class="wrap">${hl(g.gname, terms)}</td>
+      <td><a href="${progLink(p)}">${hl(g.pname, terms)}</a></td>
+      <td>${gidBtn(g)}</td><td>${ytBtn(g.stream, '▶')}</td></tr>`;
+  }
+  function draw(){
+    const terms = parseTerms($('#gq').value), nterms = terms.map(norm);
+    list = DB.rows.filter(g => matchAll(g.search, nterms));
+    list.sort((a,b) => {
+      const x = keyOf(a, sortK), y = keyOf(b, sortK);
+      const c = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'ja');
+      return (asc ? c : -c) || (a.no - b.no);
+    });
+    document.querySelectorAll('th[data-k]').forEach(th => {
+      th.classList.toggle('on', th.dataset.k === sortK);
+      th.textContent = th.textContent.replace(/ [▲▼]$/, '') + (th.dataset.k === sortK ? (asc ? ' ▲' : ' ▼') : '');
+    });
+    $('#gcount').textContent = `${list.length.toLocaleString()} 件`;
+    $('#tb').innerHTML = ''; n = 0; more(terms);
+  }
+  function more(terms = parseTerms($('#gq').value)){
+    $('#tb').insertAdjacentHTML('beforeend', list.slice(n, n + SIZE).map(g => rowHTML(g, terms)).join(''));
+    n += SIZE;
+    const b = $('#gmore'); b.style.display = n < list.length ? '' : 'none';
+    b.textContent = `もっと見る（残り ${(list.length - n).toLocaleString()} 件）`;
+  }
+  $('#gmore').onclick = () => more();
+  $('#gq').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(draw, 150); });
+  document.querySelector('thead').onclick = e => {
+    const th = e.target.closest('th[data-k]'); if (!th) return;
+    if (sortK === th.dataset.k) asc = !asc; else { sortK = th.dataset.k; asc = sortK === 'gname' || sortK === 'pname'; }
+    draw();
+  };
+  draw();
+}
+
+function barsHTML(entries){
+  const max = Math.max(...entries.map(e => e[1]));
+  return `<div class="bars">${entries.map(([k,v]) => `<div class="bar"><span>${esc(k)}</span><div class="track"><div class="fill" style="width:${(v/max*100).toFixed(1)}%"></div></div><span class="v">${v.toLocaleString()}</span></div>`).join('')}</div>`;
+}
+
+function viewRanking(){
+  const top = DB.progList.slice(0, 20);
+  const byStreams = [...DB.progs.values()].sort((a,b) => b.streams.size - a.streams.size).slice(0, 10);
+  const yearGames = {}, yearStreams = {}, yearNew = {};
+  for (const s of DB.streams){ const y = s.date?.slice(0,4); if (!y) continue; yearGames[y] = (yearGames[y]||0) + s.games.length; yearStreams[y] = (yearStreams[y]||0) + 1; }
+  for (const p of DB.progs.values()){ const y = p.first.date?.slice(0,4); if (y) yearNew[y] = (yearNew[y]||0) + 1; }
+  const biggest = DB.streams.slice().sort((a,b) => b.games.length - a.games.length).slice(0, 6);
+  app.innerHTML = `
+    <div class="two">
+      <div><h2>🏆 プレイされた作品数ランキング</h2><div class="games">${top.map((p,i) => progRow(p, {rank: i+1})).join('')}</div>
+        <a class="btn more" href="#/programmers" style="text-align:center;width:max-content">全員を見る →</a></div>
+      <div>
+        <h2>📅 登場した配信回数ランキング</h2>
+        <div class="games">${byStreams.map((p,i) => progRow(p, {rank: i+1}).replace(/<div class="cnt">\d+<small>作品<\/small>/, `<div class="cnt">${p.streams.size}<small>回</small>`)).join('')}</div>
+        <h2>📊 年ごとのプレイ作品数</h2><div class="card">${barsHTML(Object.entries(yearGames).map(([y,v]) => [y+'年', v]))}</div>
+        <h2>🌱 年ごとの新しいプログラマ</h2><div class="card">${barsHTML(Object.entries(yearNew).map(([y,v]) => [y+'年', v]))}</div>
+        <h2>📺 年ごとの配信回数</h2><div class="card">${barsHTML(Object.entries(yearStreams).map(([y,v]) => [y+'年', v]))}</div>
+      </div>
+    </div>
+    <h2>🔥 作品数が多かった配信</h2>
+    <div class="grid">${biggest.map(streamCard).join('')}</div>`;
+}
+
+function notFound(){ app.innerHTML = `<div class="empty">ページが見つかりませんでした。<br><a href="#/">ホームへ</a></div>`; }
+
+// ===================== ルーティング =====================
+function route(){
+  const parts = location.hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
+  const [r, a] = parts;
+  document.querySelectorAll('#nav a').forEach(x => {
+    const on = x.dataset.r === (r === 'stream' ? 'streams' : r === 'p' ? 'programmers' : (r || ''));
+    x.classList.toggle('on', on);
+  });
+  if (r === 'streams') viewStreams(a);
+  else if (r === 'stream') viewStream(parts.slice(1).join('/'));
+  else if (r === 'programmers') viewProgrammers();
+  else if (r === 'p') viewProgrammer(parts.slice(1).join('/'));
+  else if (r === 'games') viewGames();
+  else if (r === 'ranking') viewRanking();
+  else viewHome();
+  if (!route.first) window.scrollTo(0, 0);
+  route.first = false;
+}
+route.first = true;
+
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-copy]'); if (!b) return;
+  e.preventDefault();
+  await copyText(b.dataset.copy);
+  toast(`コピーしました：${b.dataset.copy.length > 30 ? 'リンク' : b.dataset.copy}`);
+  b.classList.add('copied'); setTimeout(() => b.classList.remove('copied'), 1200);
+});
+
+(async () => {
+  try {
+    const data = await loadJSONP();
+    if (!data?.values?.length) throw new Error('データが空です');
+    build(data);
+    $('#upd').textContent = `最終更新 ${DB.updated} ・ ${SITE_VERSION}`;
+    window.addEventListener('hashchange', route);
+    route();
+  } catch (err) {
+    app.innerHTML = `<div class="error">⚠ ${esc(err.message)}<br>時間をおいて再読み込みしてください。</div>`;
+    $('#upd').textContent = 'エラー';
+  }
+})();
+</script>
 </body>
 </html>
