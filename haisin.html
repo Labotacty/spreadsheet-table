@@ -184,10 +184,13 @@ td.wrap{white-space:normal;min-width:200px}
 // ===================== 設定 =====================
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxXHfQ7WI3hSQrItJyG-iBn6IItql81YUNMu_rayyKe4gBDkl_ijrxyutGOEQZV2j_F/exec';
 const PLAYLIST_URL = 'https://www.youtube.com/playlist?list=PLKffMDfIWsbbXZXSjrkkiFI1pk-sGPN4F';
-const SITE_VERSION = 'v1.0.0';
+const SITE_VERSION = 'v1.1.0';
+// アーカイブ動画の対応表（スプレッドシートの「アーカイブ」タブ）
+const SHEET_ID = '1Vn-LSQZHBdbfnjMfHDGD4Lqr30egE46MEQFrptIZRFc';
+const ARCHIVE_TAB = 'アーカイブ';
 
 // 配信日(JST, YYYY-MM-DD) → YouTube動画ID
-// ※スプレッドシートに「動画URL」列を追加した場合はそちらが優先されます
+// ※予備用。スプレッドシートの「アーカイブ」タブが読めればそちらが優先されます
 const ARCHIVES = {
 /*ARCHIVES_START*/
   "2021-07-24": "2OpGUi-s_nw",
@@ -523,7 +526,45 @@ function loadJSONP(){
   });
 }
 
-function build(data){
+// 「アーカイブ」タブを読み込む（Google Visualization API の JSONP）。失敗しても null を返すだけ
+function loadArchiveTab(){
+  return new Promise(resolve => {
+    const cb = 'arc_' + Date.now();
+    const sc = document.createElement('script');
+    const timer = setTimeout(() => { cleanup(); resolve(null); }, 15000);
+    function cleanup(){ clearTimeout(timer); delete window[cb]; sc.remove(); }
+    window[cb] = res => {
+      cleanup();
+      try {
+        if (res.status !== 'ok') return resolve(null);
+        const labels = res.table.cols.map(c => String(c.label || '').trim());
+        const iDate = labels.findIndex(l => l.includes('配信日'));
+        const iNo = labels.findIndex(l => l.includes('配信No'));
+        const iUrl = labels.findIndex(l => /URL|動画/i.test(l));
+        const byDate = {}, byNo = {};
+        for (const r of res.table.rows){
+          const c = r.c || [];
+          const id = ytId(c[iUrl]?.v);
+          if (!id) continue;
+          const dv = c[iDate]?.v;
+          let key = null;
+          const m = typeof dv === 'string' && dv.match(/Date\((\d+),(\d+),(\d+)/);
+          if (m) key = `${m[1]}-${pad(+m[2] + 1)}-${pad(m[3])}`;
+          else if (dv){ const t = String(dv).match(/(\d{4})\D(\d{1,2})\D(\d{1,2})/); if (t) key = `${t[1]}-${pad(t[2])}-${pad(t[3])}`; }
+          if (key) (byDate[key] ||= []).includes(id) || byDate[key].push(id);
+          const no = c[iNo]?.v;
+          if (typeof no === 'number') (byNo[no] ||= []).includes(id) || byNo[no].push(id);
+        }
+        resolve({ byDate, byNo });
+      } catch { resolve(null); }
+    };
+    sc.onerror = () => { cleanup(); resolve(null); };
+    sc.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cb}&headers=1&sheet=${encodeURIComponent(ARCHIVE_TAB)}&t=${Date.now()}`;
+    document.body.appendChild(sc);
+  });
+}
+
+function build(data, arc){
   const [head, ...body] = data.values;
   const col = name => head.findIndex(h => String(h).trim() === name);
   const C = {
@@ -576,6 +617,8 @@ function build(data){
   DB.streams.sort((a,b) => (a.date||'').localeCompare(b.date||'') || a.games[0].no - b.games[0].no);
   DB.streams.forEach((s, i) => {
     s.idx = i + 1; // 通算何回目か
+    // 優先順：シートの動画URL列 → アーカイブタブ（日付一致 → 配信No.一致） → 埋め込みの予備
+    if (!s.videos.length && arc) s.videos = (s.date && arc.byDate[s.date]) || (s.num !== null && arc.byNo[s.num]) || [];
     if (!s.videos.length && s.date && ARCHIVES[s.date]) s.videos = [].concat(ARCHIVES[s.date]);
     s.video = s.videos[0] || null;
     s.games.sort((a,b) => a.no - b.no);
@@ -947,9 +990,10 @@ document.addEventListener('click', async e => {
 
 (async () => {
   try {
-    const data = await loadJSONP();
+    const [data, arc] = await Promise.all([loadJSONP(), loadArchiveTab()]);
     if (!data?.values?.length) throw new Error('データが空です');
-    build(data);
+    if (!arc) console.warn('アーカイブタブを読み込めなかったため、埋め込みの対応表を使います');
+    build(data, arc);
     $('#upd').textContent = `最終更新 ${DB.updated} ・ ${SITE_VERSION}`;
     window.addEventListener('hashchange', route);
     route();
